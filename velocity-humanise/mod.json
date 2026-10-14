@@ -1,0 +1,50 @@
+{
+ "id": "velocity-humanise",
+ "version": "1.0",
+ "title": "Random velocity per track",
+ "category": "Sequencer",
+ "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
+ "license": "GPL-2.0-only",
+ "description": "Per track, every trig's velocity gets a random offset of up to +-N, clamped to 1..127. N is one of 16 steps (0 to 64), set with FUNC + the VEL knob on the TRIG page, where the knob becomes a sixteen-position selector and the label reads RND. Stored with the pattern beside VEL. Needs euclid-accents, which keeps the bits it is stored in. Port of rytm-mods 0003-velocity-humanise.",
+ "device": "analog-rytm-mk2",
+ "os": "1.73",
+ "sources": [
+  "velocity-humanise.s"
+ ],
+ "sites": [
+  {
+   "addr": "0x400378ae",
+   "stock": "246f0010262f001c",
+   "op": "jmp",
+   "target": "velocity_humanise_vel_amount_gate"
+  },
+  {
+   "addr": "0x4009afa0",
+   "stock": "202f003cd7ca",
+   "op": "jmp",
+   "target": "velocity_humanise_vel_humanise"
+  },
+  {
+   "addr": "0x400a85e8",
+   "stock": "282f001c266f0018",
+   "op": "jmp",
+   "target": "velocity_humanise_vel_text_gate"
+  },
+  {
+   "addr": "0x400a8f98",
+   "stock": "0c81000001d5",
+   "op": "jmp",
+   "target": "velocity_humanise_vel_label_gate"
+  },
+  {
+   "addr": "0x400a87b6",
+   "stock": "4eb9400bfd20",
+   "op": "keep2",
+   "target": "velocity_humanise_vel_get_ui"
+  }
+ ],
+ "requires": [
+  "core",
+  "euclid-accents"
+ ]
+}

@@ -1,0 +1,248 @@
+{
+ "id": "lfo-rnd",
+ "version": "1.0",
+ "title": "LFO RND page",
+ "category": "Sound",
+ "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
+ "license": "GPL-2.0-only",
+ "description": "A second LFO page, LFO RND, reached by pressing the LFO page key again: two random modifiers per sound, each a destination (DS1/DS2, one of 16, chosen from stock's LFO DST list) and a depth (DP1/DP2, 0..64 in 16 steps). On every note trig each modifier draws a random offset for its destination, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound. Port of rytm-mods 0004-lfo-rnd.",
+ "device": "analog-rytm-mk2",
+ "os": "1.73",
+ "sources": [
+  "lfo-rnd.s"
+ ],
+ "sites": [
+  {
+   "addr": "0x400378b6",
+   "stock": "77832f2a0074",
+   "op": "jmp",
+   "target": "lfo_rnd_delta_gate"
+  },
+  {
+   "addr": "0x40038462",
+   "stock": "4feffff448d7040c",
+   "op": "jmp",
+   "target": "lfo_rnd_get_gate"
+  },
+  {
+   "addr": "0x40039d32",
+   "stock": "4eb940006ea8",
+   "op": "jmp",
+   "target": "lfo_rnd_list_same_gate"
+  },
+  {
+   "addr": "0x40039d9a",
+   "stock": "4eb940006ea8",
+   "op": "jmp",
+   "target": "lfo_rnd_list_new_gate"
+  },
+  {
+   "addr": "0x4003a5f2",
+   "stock": "4eb940006ea8",
+   "op": "jmp",
+   "target": "lfo_rnd_knob_cidx_gate"
+  },
+  {
+   "addr": "0x4003ab94",
+   "stock": "2f0a4eb940078514",
+   "op": "jmp",
+   "target": "lfo_rnd_title_after_cycle"
+  },
+  {
+   "addr": "0x4004aec6",
+   "stock": "4eb9400aa214",
+   "op": "jmp",
+   "target": "lfo_rnd_list_filter_gate"
+  },
+  {
+   "addr": "0x4009b000",
+   "stock": "2945000c29400018",
+   "op": "jmp",
+   "target": "lfo_rnd_trig_cfg_gate"
+  },
+  {
+   "addr": "0x400a857c",
+   "stock": "4feffff048d7003c",
+   "op": "jmp",
+   "target": "lfo_rnd_knob_draw_gate"
+  },
+  {
+   "addr": "0x400a85f0",
+   "stock": "242f0020262f0024",
+   "op": "jmp",
+   "target": "lfo_rnd_text_gate"
+  },
+  {
+   "addr": "0x400a8dfa",
+   "stock": "4feffff048d74404",
+   "op": "jmp",
+   "target": "lfo_rnd_read_gate"
+  },
+  {
+   "addr": "0x400a9000",
+   "stock": "4fefffd848d704fc",
+   "op": "jmp",
+   "target": "lfo_rnd_setter_gate"
+  },
+  {
+   "addr": "0x400ff574",
+   "stock": "720b202f0004",
+   "op": "jmp",
+   "target": "lfo_rnd_page_info_gate"
+  },
+  {
+   "addr": "0x40120fae",
+   "stock": "4eb94009e790",
+   "op": "jmp",
+   "target": "lfo_rnd_audio_gate"
+  },
+  {
+   "addr": "0x400cb02a",
+   "stock": "7201",
+   "op": "bytes",
+   "new": "7202",
+   "kind": "code"
+  },
+  {
+   "addr": "0x400cb02e",
+   "stock": "203c401e1b14",
+   "op": "keep2",
+   "target": "lfo_rnd_lfo_pages"
+  },
+  {
+   "addr": "0x401bf950",
+   "stock": "ffffffff",
+   "op": "bytes",
+   "new": "00000000"
+  },
+  {
+   "addr": "0x401bf958",
+   "stock": "00000000",
+   "op": "bytes",
+   "new": "00007f00"
+  },
+  {
+   "addr": "0x401bf970",
+   "stock": "00000000",
+   "op": "bytes",
+   "new": "00010000"
+  },
+  {
+   "addr": "0x401bf974",
+   "stock": "402405ea",
+   "op": "ptr",
+   "target": "lfo_rnd_str_r1dst_l"
+  },
+  {
+   "addr": "0x401bf978",
+   "stock": "4024084f",
+   "op": "ptr",
+   "target": "lfo_rnd_str_group"
+  },
+  {
+   "addr": "0x401bf97c",
+   "stock": "40236f0d",
+   "op": "ptr",
+   "target": "lfo_rnd_str_r1dst"
+  },
+  {
+   "addr": "0x401bf984",
+   "stock": "ffffffff",
+   "op": "bytes",
+   "new": "00000000"
+  },
+  {
+   "addr": "0x401bf98c",
+   "stock": "00000000",
+   "op": "bytes",
+   "new": "00007f00"
+  },
+  {
+   "addr": "0x401bf9a8",
+   "stock": "402405ea",
+   "op": "ptr",
+   "target": "lfo_rnd_str_r1dep_l"
+  },
+  {
+   "addr": "0x401bf9ac",
+   "stock": "4024084f",
+   "op": "ptr",
+   "target": "lfo_rnd_str_group"
+  },
+  {
+   "addr": "0x401bf9b0",
+   "stock": "40236f0d",
+   "op": "ptr",
+   "target": "lfo_rnd_str_r1dep"
+  },
+  {
+   "addr": "0x401bf9b8",
+   "stock": "ffffffff",
+   "op": "bytes",
+   "new": "00000000"
+  },
+  {
+   "addr": "0x401bf9c0",
+   "stock": "00000000",
+   "op": "bytes",
+   "new": "00007f00"
+  },
+  {
+   "addr": "0x401bf9d8",
+   "stock": "00000000",
+   "op": "bytes",
+   "new": "00010000"
+  },
+  {
+   "addr": "0x401bf9dc",
+   "stock": "402405ea",
+   "op": "ptr",
+   "target": "lfo_rnd_str_r2dst_l"
+  },
+  {
+   "addr": "0x401bf9e0",
+   "stock": "4024084f",
+   "op": "ptr",
+   "target": "lfo_rnd_str_group"
+  },
+  {
+   "addr": "0x401bf9e4",
+   "stock": "40236f0d",
+   "op": "ptr",
+   "target": "lfo_rnd_str_r2dst"
+  },
+  {
+   "addr": "0x401bf9ec",
+   "stock": "ffffffff",
+   "op": "bytes",
+   "new": "00000000"
+  },
+  {
+   "addr": "0x401bf9f4",
+   "stock": "00000000",
+   "op": "bytes",
+   "new": "00007f00"
+  },
+  {
+   "addr": "0x401bfa10",
+   "stock": "402405ea",
+   "op": "ptr",
+   "target": "lfo_rnd_str_r2dep_l"
+  },
+  {
+   "addr": "0x401bfa14",
+   "stock": "4024084f",
+   "op": "ptr",
+   "target": "lfo_rnd_str_group"
+  },
+  {
+   "addr": "0x401bfa18",
+   "stock": "40236f0d",
+   "op": "ptr",
+   "target": "lfo_rnd_str_r2dep"
+  }
+ ],
+ "requires": [
+  "core"
+ ]
+}

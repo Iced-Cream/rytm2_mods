@@ -1,0 +1,43 @@
+{
+ "id": "kit-ab",
+ "version": "1.0",
+ "title": "Kit A/B: edits vs saved",
+ "category": "Workflow",
+ "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
+ "license": "GPL-2.0-only",
+ "description": "NO + PLAY becomes an A/B between the kit as edited and as saved. The first press keeps the edits in a stash and reloads the saved kit, under stock's popup (\"KIT 1 RELOADED!\"); the next puts the edits back (\"EDITS RESTORED!\"). Editing while the original plays ends the A/B: the next press keeps those edits instead, dropping the stashed ones, and reloads as a first press does. The same happens after a change of kit or any other reload, found by a checksum of the working kit taken after each press. A press on a kit with no edits is a plain reload and arms nothing. Repoints both single-kit reload calls and their popups' text: the key handler's NO + PLAY (0x400cd4ae, \"KIT %d RELOADED!\") and kit_reload_key (0x400dd5de, \"KIT RELOADED!\"). The stash, one 0x9e3-byte kit, comes from the firmware's heap on the first press. The restore copies it back and applies it exactly as stock's reload applies the saved kit, including kit_mark(working, 0), whose meaning is not established. Reloading every kit stays stock. Port of rytm-mods 0010-kit-ab.",
+ "device": "analog-rytm-mk2",
+ "os": "1.73",
+ "sources": [
+  "kit-ab.s"
+ ],
+ "sites": [
+  {
+   "addr": "0x400cd4ae",
+   "stock": "4eb9400af0d2",
+   "op": "keep2",
+   "target": "kit_ab_toggle"
+  },
+  {
+   "addr": "0x400cd4d6",
+   "stock": "487940255ea6",
+   "op": "keep2",
+   "target": "kit_ab_kab_msg"
+  },
+  {
+   "addr": "0x400dd5de",
+   "stock": "4eb9400af0d2",
+   "op": "keep2",
+   "target": "kit_ab_toggle"
+  },
+  {
+   "addr": "0x400dd5e6",
+   "stock": "4879402578ae",
+   "op": "keep2",
+   "target": "kit_ab_kab_msg"
+  }
+ ],
+ "requires": [
+  "core"
+ ]
+}

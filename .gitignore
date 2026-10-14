@@ -1,0 +1,5 @@
+out/
+*.elemod
+*.syx
+*.bin
+__pycache__/

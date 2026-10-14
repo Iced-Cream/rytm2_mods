@@ -1,0 +1,18 @@
+{
+ "id": "env-reset-amp",
+ "version": "1.0",
+ "title": "ENV RESET reaches AMP",
+ "category": "Sound",
+ "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
+ "license": "GPL-2.0-only",
+ "description": "SOUND SETTINGS ENV RESET can be set to AMP and AMP+FILT: with the amp bit set the amp envelope restarts from silence on every trig, so AMP ATK is heard on every hit (a retrig on a sounding voice can click). Port of rytm-mods 0015-env-reset-amp.",
+ "device": "analog-rytm-mk2",
+ "os": "1.73",
+ "sources": ["env-reset-amp.s"],
+ "sites": [
+  {"addr": "0x400bcf1e", "stock": "7402", "op": "bytes", "new": "7403", "kind": "code"},
+  {"addr": "0x400ef86a", "stock": "d683", "op": "bytes", "new": "4e71", "kind": "code"},
+  {"addr": "0x40109b04", "stock": "0080b0000000", "op": "jmp", "target": "env_reset_amp_attack"}
+ ],
+ "requires": ["core"]
+}
