@@ -40,11 +40,11 @@ Edit a sound (e.g. BD DEC). NO + PLAY: KIT 1 RELOADED!, the saved value. NO + PL
 
 - Built with elekloader at d17478b and m68k-linux-gnu binutils 2.42: `.run` 340 B,
   4 sites, 0 relocations; lint OK; links with core-ar2 0.1 and the other ports.
-- Against rytm-mods-src's default build (T2, sha256 877831d7...): the original stub, re-assembled
+- Against rytm-mods-src's default build (all of its mods at their default params; "T2" below): the original stub, re-assembled
   as rytm-mods' build does, equals T2's caves byte for byte (.text 0x40137b50, .kab 0x401ba490). Each of its 11
-  labels was then disassembled in T2 and in R2T3 with every address named by its label: the
+  labels was then disassembled in T2 and in the full build with every address named by its label: the
   instructions match.
-- Every byte R2T3 changes in the OS is inside one of the ports' sites, every one of these sites is
+- Every byte the full build changes in the OS is inside one of the ports' sites, every one of these sites is
   patched in T2 too, and the `bytes` sites write exactly T2's bytes.
-- rytm-emu (3c4c42c), build R2T3 (core-ar2 + all eleven ports, sha256 57fc1444...): BD TUN edited, then KIT menu (FUNC + PLAYMODE) > RELOAD twice: KIT RELOADED!, then EDITS RESTORED! with TUN back at the edited value (stock: KIT RELOADED! both times, TUN saved); all 14 screens pixel-identical to T2. NO + PLAY itself did not reach the reload handler in the emulator on any build, stock included, so that key combination is for the unit.
-- Hardware: R2T3 (sha256 57fc1444...7243) flashed by Iced-Cream, 2026-10-14: works as described (NO + PLAY).
+- rytm-emu (3c4c42c), the full build (core-ar2 with all eleven ports): BD TUN edited, then KIT menu (FUNC + PLAYMODE) > RELOAD twice: KIT RELOADED!, then EDITS RESTORED! with TUN back at the edited value (stock: KIT RELOADED! both times, TUN saved); all 14 screens pixel-identical to T2. NO + PLAY itself did not reach the reload handler in the emulator on any build, stock included, so that key combination is for the unit.
+- Hardware: on an Analog Rytm MKII, 2026-10-14, in the full build (core-ar2 with all eleven ports): works as described (NO + PLAY).

@@ -53,45 +53,61 @@ velocity-humanise, lfo-rnd and voice-dac those of param_value_text (0x400a85e0..
 Each is its own site, and each stub rejoins at the next instruction, which is the next mod's
 jmp when that mod is linked and stock when it is not - as in rytm-mods.
 
-## Build (WSL, an elekloader checkout at upstream main)
+## Build
+
+You need:
+
+- an [elekloader](https://github.com/irpina/elekloader) checkout at `main` (Analog Rytm MKII
+  support and `core-ar2` arrived in irpina/elekloader#89) and the Python 3 it asks for;
+- ColdFire binutils on `PATH` (`m68k-linux-gnu-as` and `-ld`; on Debian or Ubuntu,
+  `apt install binutils-m68k-linux-gnu`);
+- your own copy of Elektron's stock Analog Rytm MKII OS 1.73 `.syx`. It is never part of
+  this repository or of anything built from it.
 
 ```bash
-EL=~/elekloader            # elekloader checkout
-R2=/mnt/d/Development/Repos/rytm2_mods
-STOCK=/mnt/d/Development/Projects/ARMKII/Analog-Rytm_MKII_OS1.73.syx
-cd $EL
-python3 -m elekloader.sdk.build mods/core-ar2 --stock $STOCK
+EL=path/to/elekloader                        # the elekloader checkout
+R2=path/to/rytm2_mods                        # this repository
+STOCK=path/to/Analog-Rytm_MKII_OS1.73.syx    # your stock OS file
+cd "$EL"
+python3 -m elekloader.sdk.build mods/core-ar2 --stock "$STOCK"
 MODS="filter-hz ctrl-all env-reset-amp slice-loop euclid-accents velocity-humanise lfo-rnd
       comp-preview main-rms kit-ab voice-dac"
 ARGS=""
 for m in $MODS; do
-  python3 -m elekloader.sdk.build $R2/$m --stock $STOCK
+  python3 -m elekloader.sdk.build "$R2/$m" --stock "$STOCK"
   ARGS="$ARGS --mod $R2/$m/out/$m-1.0.elemod"
 done
-python3 -m elekloader.patch --stock $STOCK --mod mods/core-ar2/out/core-0.1.elemod $ARGS \
-    --out /mnt/d/Development/Projects/ARMKII/build/r2-all.syx --version R2T3
+python3 -m elekloader.patch --stock "$STOCK" --mod mods/core-ar2/out/core-0.1.elemod $ARGS \
+    --out rytm-mods.syx --version R2AL
 ```
 
-`out/` folders are build output: keep them out of git.
+Leave out any mod you don't want from `MODS`, but keep euclid-accents whenever
+velocity-humanise is in: elekloader refuses velocity-humanise without it. `elekloader.patch`
+checks that the selected mods combine before it writes anything. `--version` is the
+four characters the unit shows as its OS version. The result is your own firmware file:
+keep it, and the `out/` build folders, out of git and out of any upload.
 
 ## Status
 
 | rytm-mods-src | here | source status | port |
 |---|---|---|---|
 | 0000-shared | `shared/shared.s` | built | ported (included by velocity-humanise, lfo-rnd, voice-dac) |
-| 0008-filter-hz | `filter-hz/` | hardware-verified | **confirmed on a unit** (FZ01) |
-| 0012-slice-loop | `slice-loop/` | hardware-verified | **confirmed on a unit** (R2T1) |
-| 0014-ctrl-all | `ctrl-all/` | hardware-verified | **confirmed on a unit** (R2T1); on the SYNTH page only tracks with the selected track's machine follow |
-| 0015-env-reset-amp | `env-reset-amp/` | hardware-verified | **confirmed on a unit** (R2T1); bit probe left out |
-| 0002-euclid-accents | `euclid-accents/` | hardware-verified | matches rytm-mods' build label by label; **confirmed on a unit** (R2T3) |
-| 0003-velocity-humanise | `velocity-humanise/` | built (MANUAL: verified) | needs euclid-accents; matches label by label; **confirmed on a unit** (R2T3) |
-| 0004-lfo-rnd | `lfo-rnd/` | built (MANUAL: verified) | matches label by label; **confirmed on a unit** (R2T3) |
-| 0006-comp-preview | `comp-preview/` | hardware-verified | matches label by label; **confirmed on a unit** (R2T3) |
-| 0009-main-rms | `main-rms/` | built (MANUAL: display checked on the device) | matches label by label; **confirmed on a unit** (R2T3) |
-| 0010-kit-ab | `kit-ab/` | hardware-verified | matches label by label; **confirmed on a unit** (R2T3) |
-| 0013-voice-dac | `voice-dac/` | hardware-verified | default build only (no timing, prof, burn or dbg); matches label by label; DAC SUM audio sample-identical to rytm-mods' build in rytm-emu; on a unit (R2T3) DAC SUM works but the mix sounds bit- or sample-rate-reduced, as it does on rytm-mods' own build (see its README) |
+| 0008-filter-hz | `filter-hz/` | hardware-verified | matches label by label; **confirmed on a unit** |
+| 0012-slice-loop | `slice-loop/` | hardware-verified | matches label by label; **confirmed on a unit** |
+| 0014-ctrl-all | `ctrl-all/` | hardware-verified | matches label by label; **confirmed on a unit** |
+| 0015-env-reset-amp | `env-reset-amp/` | hardware-verified | bit probe left out; matches label by label; **confirmed on a unit** |
+| 0002-euclid-accents | `euclid-accents/` | hardware-verified | matches label by label; **confirmed on a unit** |
+| 0003-velocity-humanise | `velocity-humanise/` | built (MANUAL: verified) | needs euclid-accents; matches label by label; **confirmed on a unit** |
+| 0004-lfo-rnd | `lfo-rnd/` | built (MANUAL: verified) | matches label by label; **confirmed on a unit** |
+| 0006-comp-preview | `comp-preview/` | hardware-verified | matches label by label; **confirmed on a unit** |
+| 0009-main-rms | `main-rms/` | built (MANUAL: display checked on the device) | matches label by label; **confirmed on a unit** |
+| 0010-kit-ab | `kit-ab/` | hardware-verified | matches label by label; **confirmed on a unit** |
+| 0013-voice-dac | `voice-dac/` | hardware-verified | default build only (no timing, prof, burn or dbg); matches label by label; **confirmed on a unit** |
 
-Every mod on rytm-mods-src main is now ported. For all eleven: every byte the R2T3 build changes
+Every mod on rytm-mods-src main is now ported. "Matches label by label": `tools/verify_port.py`
+re-assembles rytm-mods' own code, checks it equals rytm-mods-src's default build ("T2"), then
+compares each label's instructions with the port's, every address named by its label. For all
+eleven, in the full build (core-ar2 with every port, as in Build above): every byte it changes
 in the OS is inside one of the ports' sites, every one of those sites is also patched by
 rytm-mods' default build (T2), and the `bytes` sites write T2's bytes exactly. rytm-mods'
 diagnostic builds (its non-default params and the claims they gate) are not ported.

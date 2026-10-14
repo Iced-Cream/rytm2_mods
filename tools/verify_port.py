@@ -13,7 +13,7 @@
 
 usage: verify_port.py ELEKLOADER RYTM_MODS_SRC MOD_DIR NEW_ID STOCK T2 NEW NEW_MAP INC
 
-e.g. python3 -I tools/verify_port.py ~/elekloader ../rytm-mods-src 0013-voice-dac voice-dac \
+e.g. python3 -I tools/verify_port.py path/to/elekloader ../rytm-mods-src 0013-voice-dac voice-dac \
        STOCK.syx T2.syx r2-all.syx r2-all.syx.map.json include/ar2-1.73.inc
 (T2: rytm-mods-src's default build; NEW and its .map.json: an elekloader.patch build with the port.
 Reads both images locally and prints addresses, labels and instruction text only.)

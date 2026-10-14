@@ -4,9 +4,8 @@
 
     PYTHONPATH=$EL python3 tools/port_mod.py RYTM_MODS_SRC MOD_DIR NEW_ID STOCK_SYX
 
-e.g. PYTHONPATH=~/elekloader python3 tools/port_mod.py ../rytm-mods-src \
-         0003-velocity-humanise velocity-humanise \
-         /mnt/d/Development/Projects/ARMKII/Analog-Rytm_MKII_OS1.73.syx
+e.g. PYTHONPATH=path/to/elekloader python3 tools/port_mod.py ../rytm-mods-src \
+         0003-velocity-humanise velocity-humanise path/to/Analog-Rytm_MKII_OS1.73.syx
 
 Needs elekloader importable (PYTHONPATH pointing at an elekloader checkout) and
 m68k-linux-gnu-objdump on PATH. Writes NEW_ID/NEW_ID.s and NEW_ID/mod.json;

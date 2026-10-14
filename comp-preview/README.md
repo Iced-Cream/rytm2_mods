@@ -46,12 +46,12 @@ table is a `ptr` site.
 
 - Built with elekloader at d17478b and m68k-linux-gnu binutils 2.42: `.run` 3856 B,
   6 sites, 19 relocations; lint OK; links with core-ar2 0.1 and the other ports.
-- Against rytm-mods-src's default build (T2, sha256 877831d7...): the original stub, re-assembled
+- Against rytm-mods-src's default build (all of its mods at their default params; "T2" below): the original stub, re-assembled
   as rytm-mods' build does, equals T2's caves byte for byte (.text 0x40029060, .state 0x402cdf94, .aux 0x402ccfa8, .tab 0x4002871c, .ui 0x400287fc, .sat 0x401ba290, .ring 0x40289ab8, .sc 0x40289b38). Each of its 61
-  labels was then disassembled in T2 and in R2T3 with every address named by its label: the
+  labels was then disassembled in T2 and in the full build with every address named by its label: the
   instructions match (two tables, `reltab` and `hrestab`, compared as bytes: identical).
-- Every byte R2T3 changes in the OS is inside one of the ports' sites, every one of these sites is
+- Every byte the full build changes in the OS is inside one of the ports' sites, every one of these sites is
   patched in T2 too, and the `bytes` sites write exactly T2's bytes.
-- rytm-emu (3c4c42c), build R2T3 (core-ar2 + all eleven ports, sha256 57fc1444...): FX track, AMP twice, PLAY: the estimate scrolls, pixel-identical to T2 except one label: here the SEQ knob's value text (LPF) goes back to SEQ after about 1 s, in T2 it stays LPF. The label times itself on DMA timer 0's counter. In the emulator nothing starts that timer before the OS, so without a core it reads 0 and the value never times out; core-ar2 starts it when it finds it stopped (`mods/core/core.s`). On a unit something before the OS has already started it, so both builds should time out as here: step 3 of the test checks that.
-- Hardware: R2T3 (sha256 57fc1444...7243) flashed by Iced-Cream, 2026-10-14: works as described; the SEQ value goes back to its name after about 1 s, as the emulator
+- rytm-emu (3c4c42c), the full build (core-ar2 with all eleven ports): FX track, AMP twice, PLAY: the estimate scrolls, pixel-identical to T2 except one label: here the SEQ knob's value text (LPF) goes back to SEQ after about 1 s, in T2 it stays LPF. The label times itself on DMA timer 0's counter. In the emulator nothing starts that timer before the OS, so without a core it reads 0 and the value never times out; core-ar2 starts it when it finds it stopped (`mods/core/core.s`). On a unit something before the OS has already started it, so both builds should time out as here: step 3 of the test checks that.
+- Hardware: on an Analog Rytm MKII, 2026-10-14, in the full build (core-ar2 with all eleven ports): works as described; the SEQ value goes back to its name after about 1 s, as the emulator
   showed with core-ar2.

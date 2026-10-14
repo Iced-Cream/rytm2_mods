@@ -37,10 +37,11 @@ an empty icon), appends it, re-emits the `movem.l` and rejoins at 0x400f9e9c.
 
 ## Results so far
 
-- Hardware: R2T1 flashed by Iced-Cream, 2026-10-13: works as described.
+- Hardware: on an Analog Rytm MKII, 2026-10-13, in a build of core-ar2 with filter-hz, ctrl-all,
+  env-reset-amp and slice-loop: works as described.
 - `.run` 752 B, 1 site, 6 relocations; lint OK; links with core-ar2 0.1.
 - The 751 B of code and strings linked into the image are byte-identical to the stub in
   rytm-mods-src's default build (cave8, 0x40012aa0) except the 6 relocated words, each moved by
   exactly the difference between the two load addresses.
-- rytm-emu, build R2T1: FUNC + CHRO lists SLICE LOOP after SAVE TRACK; choosing it on BD shows LOOP
+- rytm-emu, the four-mod build above: FUNC + CHRO lists SLICE LOOP after SAVE TRACK; choosing it on BD shows LOOP
   SLICED, choosing it again shows TRACK NOT EMPTY. Stock lists no such item.

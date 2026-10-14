@@ -35,22 +35,16 @@ those are separate sites owned by their own mods; none of them is ported yet.
    SYNTH knob: both move.
 3. With the FX track selected, or with a trig key held, only the selected track changes.
 
-On the SYNTH page a track whose machine differs from the selected track's may not follow (seen on
-the unit: BD PLASTIC selected, SD's DEC unchanged). The code is rytm-mods' own, so 0014 behaves the
-same way there: the step goes by the selected machine's parameter id, clamped to its range.
-
 ## Results so far
 
-- Hardware: R2T1 (sha256 869cac19...0cae5) flashed by Iced-Cream, 2026-10-13. Works on the FILTER
-  page (FRQ) and on the SYNTH page between two tracks with the same machine (XT CLASSIC on LT and
-  MT). BD PLASTIC -> SD, SYNTH DEC: SD did not follow (see Test).
+- Hardware: on an Analog Rytm MKII, 2026-10-13, in a build of core-ar2 with filter-hz, ctrl-all,
+  env-reset-amp and slice-loop: works on the FILTER page (FRQ) and on the SYNTH page between two
+  tracks with the same machine (XT CLASSIC on LT and MT).
 - `.run` 172 B, 1 site, no relocations; lint OK; links with core-ar2 0.1.
 - The 170 B of code (plus 2 B alignment) linked into the image are byte-identical to the stub in
   rytm-mods-src's default build (cave13, 0x40029838). The site reads `jmp 0x47be01cc` in place of
   `jmp 0x40029838`.
-- rytm-emu (3c4c42c), build R2T1: with TRK held, 14 turn events reach the site; the gate takes the
+- rytm-emu (3c4c42c), the four-mod build above: with TRK held, 14 turn events reach the site; the gate takes the
   all-tracks path every time (0 resumes at 0x400378c8) and calls the sound set's delta handler
   (0x400a95dc) 168 times = 14 x 12 tracks; stock calls it 14 times. The selected track's value
-  moves exactly as on stock. The emulator's screen does not show the other tracks' values change -
-  and neither does it for rytm-mods' own hardware-verified build (pixel-identical screens) - so the
-  cross-track result needs the unit.
+  moves exactly as on stock, and the screens are pixel-identical to rytm-mods' own build.

@@ -41,13 +41,14 @@ voice-command routine (0x401098d4).
 
 ## Results so far
 
-- Hardware: R2T1 flashed by Iced-Cream, 2026-10-13: works as described (ENV RESET values and the
+- Hardware: on an Analog Rytm MKII, 2026-10-13, in a build of core-ar2 with filter-hz, ctrl-all,
+  env-reset-amp and slice-loop: works as described (ENV RESET values and the
   amp restart).
 - `.run` 52 B (50 B of code), 3 sites, no relocations; lint OK; links with core-ar2 0.1.
 - The 50 B of code are byte-identical to the stub in rytm-mods-src's default build (cave13,
   0x400298e4); the two byte sites match that build byte for byte; the probe's patch site is stock in
   both.
-- rytm-emu, build R2T1: ENV RESET steps FILTER -> AMP -> OFF and OFF -> AMP -> FILTER -> AMP+FILT
+- rytm-emu, the four-mod build above: ENV RESET steps FILTER -> AMP -> OFF and OFF -> AMP -> FILTER -> AMP+FILT
   (stock: FILTER <-> OFF only); with AMP chosen, BD's ENV RESET byte in the engine reads 01 (stock
   00). Three BD pad hits reach the attack site and resume at 0x40109b0a on both builds. The
   emulator's voice model is not used to judge the sound: that needs the unit.
