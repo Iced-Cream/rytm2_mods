@@ -1,6 +1,6 @@
 {
  "id": "voice-dac",
- "version": "1.0",
+ "version": "1.1",
  "title": "DAC sum, voice filter, shaper and polarity",
  "category": "Sound",
  "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
@@ -310,5 +310,309 @@
  ],
  "requires": [
   "core"
- ]
+ ],
+ "ports": {
+  "1.74": {
+   "sources": [
+    "os1.74/voice-dac.s"
+   ],
+   "sites": [
+    {
+     "addr": "0x40007660",
+     "stock": "732a00047401",
+     "op": "jmp",
+     "target": "voice_dac_dac_load"
+    },
+    {
+     "addr": "0x40007bb0",
+     "stock": "7002156b00d30046",
+     "op": "jmp",
+     "target": "voice_dac_dac_save"
+    },
+    {
+     "addr": "0x400081f6",
+     "stock": "4fefffe848d73c0c",
+     "op": "jmp",
+     "target": "voice_dac_snd_load"
+    },
+    {
+     "addr": "0x4000826a",
+     "stock": "41f9401c5d24",
+     "op": "jmp",
+     "target": "voice_dac_hpf_load"
+    },
+    {
+     "addr": "0x40008364",
+     "stock": "4a0266102f03",
+     "op": "jmp",
+     "target": "voice_dac_rte_rload"
+    },
+    {
+     "addr": "0x40008492",
+     "stock": "41f9401c5c7c",
+     "op": "jmp",
+     "target": "voice_dac_hpf_save"
+    },
+    {
+     "addr": "0x400122d0",
+     "stock": "204a264a4298",
+     "op": "jmp",
+     "target": "voice_dac_snd_init"
+    },
+    {
+     "addr": "0x4003391e",
+     "stock": "3191080043ee0013",
+     "op": "jmp",
+     "target": "voice_dac_rte_setrte_at"
+    },
+    {
+     "addr": "0x40033a1c",
+     "stock": "31810800203c401cb88c",
+     "op": "jmp",
+     "target": "voice_dac_rte_set_at"
+    },
+    {
+     "addr": "0x40033a90",
+     "stock": "41f3ba00588f",
+     "op": "jmp",
+     "target": "voice_dac_rte_get_at"
+    },
+    {
+     "addr": "0x400378bc",
+     "stock": "4eb9400b693e",
+     "op": "jmp",
+     "target": "voice_dac_hpf_delta"
+    },
+    {
+     "addr": "0x4003846a",
+     "stock": "246f0010242f0014",
+     "op": "jmp",
+     "target": "voice_dac_hpf_get"
+    },
+    {
+     "addr": "0x4003ab86",
+     "stock": "222a008c5281",
+     "op": "jmp",
+     "target": "voice_dac_hpf_cycle"
+    },
+    {
+     "addr": "0x400a2b1a",
+     "stock": "48d71c04246e0008",
+     "op": "jmp",
+     "target": "voice_dac_hpf_refresh"
+    },
+    {
+     "addr": "0x400a85f0",
+     "stock": "242f001c262f0028",
+     "op": "jmp",
+     "target": "voice_dac_flt_glyph"
+    },
+    {
+     "addr": "0x400a8664",
+     "stock": "2f044eb9400ff5c2",
+     "op": "jmp",
+     "target": "voice_dac_hpf_text"
+    },
+    {
+     "addr": "0x400c51b4",
+     "stock": "3191080043ee0013",
+     "op": "jmp",
+     "target": "voice_dac_rte_setrte_vel"
+    },
+    {
+     "addr": "0x400c52b2",
+     "stock": "31810800203c401cb88c",
+     "op": "jmp",
+     "target": "voice_dac_rte_set_vel"
+    },
+    {
+     "addr": "0x400c5326",
+     "stock": "41f3ba00588f",
+     "op": "jmp",
+     "target": "voice_dac_rte_get_vel"
+    },
+    {
+     "addr": "0x400d2eae",
+     "stock": "7206b280660002ec",
+     "op": "jmp",
+     "target": "voice_dac_flt_graph"
+    },
+    {
+     "addr": "0x400d9088",
+     "stock": "205448780002",
+     "op": "jmp",
+     "target": "voice_dac_dac_menu_add"
+    },
+    {
+     "addr": "0x400ff5fe",
+     "stock": "203c401ec820",
+     "op": "jmp",
+     "target": "voice_dac_hpf_page_info"
+    },
+    {
+     "addr": "0x4011f6a8",
+     "stock": "3169007004c0",
+     "op": "jmp",
+     "target": "voice_dac_rte_pushv"
+    },
+    {
+     "addr": "0x4011f6cc",
+     "stock": "30aa008c2240",
+     "op": "jmp",
+     "target": "voice_dac_rte_pusha"
+    },
+    {
+     "addr": "0x4011fe4e",
+     "stock": "4eb94010e9b0",
+     "op": "jmp",
+     "target": "voice_dac_vs_alt"
+    },
+    {
+     "addr": "0x40121322",
+     "stock": "13c180006466",
+     "op": "jmp",
+     "target": "voice_dac_route_all"
+    },
+    {
+     "addr": "0x401213d0",
+     "stock": "720541f94013f738",
+     "op": "jmp",
+     "target": "voice_dac_vs_main"
+    },
+    {
+     "addr": "0x400cafee",
+     "stock": "7201",
+     "op": "bytes",
+     "new": "7202",
+     "kind": "code"
+    },
+    {
+     "addr": "0x400caff2",
+     "stock": "203c401e1dcc",
+     "op": "keep2",
+     "target": "voice_dac_filter_pages"
+    },
+    {
+     "addr": "0x401bfcd8",
+     "stock": "00000000",
+     "op": "bytes",
+     "new": "00007f00"
+    },
+    {
+     "addr": "0x401bfcf4",
+     "stock": "4024091a",
+     "op": "ptr",
+     "target": "voice_dac_txt_frq_long"
+    },
+    {
+     "addr": "0x401bfcfc",
+     "stock": "4023723d",
+     "op": "ptr",
+     "target": "voice_dac_txt_frq_short"
+    },
+    {
+     "addr": "0x401bfd40",
+     "stock": "00000000",
+     "op": "bytes",
+     "new": "00007f00"
+    },
+    {
+     "addr": "0x401bfd5c",
+     "stock": "4024091a",
+     "op": "ptr",
+     "target": "voice_dac_txt_atk_long"
+    },
+    {
+     "addr": "0x401bfd64",
+     "stock": "4023723d",
+     "op": "ptr",
+     "target": "voice_dac_txt_atk_short"
+    },
+    {
+     "addr": "0x401bfe10",
+     "stock": "00000000",
+     "op": "bytes",
+     "new": "00000700"
+    },
+    {
+     "addr": "0x401bfe2c",
+     "stock": "4024091a",
+     "op": "ptr",
+     "target": "voice_dac_txt_typ_long"
+    },
+    {
+     "addr": "0x401bfe34",
+     "stock": "4023723d",
+     "op": "ptr",
+     "target": "voice_dac_txt_typ_short"
+    },
+    {
+     "addr": "0x401bfe44",
+     "stock": "00000000",
+     "op": "bytes",
+     "new": "00007f00"
+    },
+    {
+     "addr": "0x401bfe60",
+     "stock": "4024091a",
+     "op": "ptr",
+     "target": "voice_dac_txt_dep_long"
+    },
+    {
+     "addr": "0x401bfe68",
+     "stock": "4023723d",
+     "op": "ptr",
+     "target": "voice_dac_txt_dep_short"
+    },
+    {
+     "addr": "0x401bfe78",
+     "stock": "00000000",
+     "op": "bytes",
+     "new": "00007f00"
+    },
+    {
+     "addr": "0x401bfe94",
+     "stock": "4024091a",
+     "op": "ptr",
+     "target": "voice_dac_txt_res_long"
+    },
+    {
+     "addr": "0x401bfe9c",
+     "stock": "4023723d",
+     "op": "ptr",
+     "target": "voice_dac_txt_res_short"
+    },
+    {
+     "addr": "0x401bfeac",
+     "stock": "00000000",
+     "op": "bytes",
+     "new": "00007f00"
+    },
+    {
+     "addr": "0x401bfec8",
+     "stock": "4024091a",
+     "op": "ptr",
+     "target": "voice_dac_txt_sus_long"
+    },
+    {
+     "addr": "0x401bfed0",
+     "stock": "4023723d",
+     "op": "ptr",
+     "target": "voice_dac_txt_sus_short"
+    },
+    {
+     "addr": "0x401c58c4",
+     "stock": "40237f69",
+     "op": "ptr",
+     "target": "voice_dac_txt_pol_long"
+    },
+    {
+     "addr": "0x401c58cc",
+     "stock": "4025a72c",
+     "op": "ptr",
+     "target": "voice_dac_txt_pol_short"
+    }
+   ]
+  }
+ }
 }

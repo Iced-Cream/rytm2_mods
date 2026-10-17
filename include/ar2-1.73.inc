@@ -20,6 +20,7 @@
         .equ    fpga_status_bit5, 0x4000076a   | fn, verified
         .equ    param_tables_build, 0x40006cd8   | fn, verified
         .equ    param_container_index, 0x40006ea8   | fn, verified
+        .equ    param_is_machine, 0x40006f18   | fn, verified
         .equ    sound_param_id_for_index, 0x40007028   | fn, verified
         .equ    machine_available, 0x400070e6   | fn, verified
         .equ    machine_home_track, 0x40007116   | fn, verified

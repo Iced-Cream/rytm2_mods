@@ -121,5 +121,120 @@
  ],
  "requires": [
   "core"
- ]
+ ],
+ "ports": {
+  "1.74": {
+   "sources": [
+    "os1.74/euclid-accents.s"
+   ],
+   "sites": [
+    {
+     "addr": "0x40008cc4",
+     "stock": "d08091804480",
+     "op": "jmp",
+     "target": "euclid_accents_pattern_load_accent"
+    },
+    {
+     "addr": "0x40008f62",
+     "stock": "712a02caef88",
+     "op": "jmp",
+     "target": "euclid_accents_pattern_save_accent"
+    },
+    {
+     "addr": "0x400378a6",
+     "stock": "4feffff448d7040c",
+     "op": "jmp",
+     "target": "euclid_accents_param_delta_gate"
+    },
+    {
+     "addr": "0x4009ab36",
+     "stock": "102802ca43f37a00",
+     "op": "jmp",
+     "target": "euclid_accents_trig_fire_euclid_masked"
+    },
+    {
+     "addr": "0x4009abde",
+     "stock": "75f208006014",
+     "op": "jmp",
+     "target": "euclid_accents_trig_fire_accent"
+    },
+    {
+     "addr": "0x400a864c",
+     "stock": "4fefffec48d70c1c",
+     "op": "jmp",
+     "target": "euclid_accents_boolop_text_gate"
+    },
+    {
+     "addr": "0x400c0e6e",
+     "stock": "2f0a246f0008",
+     "op": "jmp",
+     "target": "euclid_accents_euclid_enabled_get_masked"
+    },
+    {
+     "addr": "0x400c0e9e",
+     "stock": "598f2f0e2f0a",
+     "op": "jmp",
+     "target": "euclid_accents_euclid_enabled_set_keep"
+    },
+    {
+     "addr": "0x400c3c7a",
+     "stock": "4fefff8848d77cfc",
+     "op": "jmp",
+     "target": "euclid_accents_euclid_bake_gate"
+    },
+    {
+     "addr": "0x400a88b8",
+     "stock": "4eb9400c121c",
+     "op": "keep2",
+     "target": "euclid_accents_boolop_get_ui"
+    },
+    {
+     "addr": "0x400a9d16",
+     "stock": "4eb9400c124c",
+     "op": "keep2",
+     "target": "euclid_accents_boolop_set_ui"
+    },
+    {
+     "addr": "0x400ff44c",
+     "stock": "7203",
+     "op": "bytes",
+     "new": "7207",
+     "kind": "code"
+    },
+    {
+     "addr": "0x400ff456",
+     "stock": "7003",
+     "op": "bytes",
+     "new": "7007",
+     "kind": "code"
+    },
+    {
+     "addr": "0x400ff460",
+     "stock": "43f9401ec6b0",
+     "op": "keep2",
+     "target": "euclid_accents_boolop_labels"
+    },
+    {
+     "addr": "0x400ff4e2",
+     "stock": "7203",
+     "op": "bytes",
+     "new": "7207",
+     "kind": "code"
+    },
+    {
+     "addr": "0x400ff4fe",
+     "stock": "7003",
+     "op": "bytes",
+     "new": "7007",
+     "kind": "code"
+    },
+    {
+     "addr": "0x401432f0",
+     "stock": "4eb9401b7f74",
+     "op": "keep2",
+     "target": "euclid_accents_bitmapset8"
+    }
+   ]
+  }
+ }
 }

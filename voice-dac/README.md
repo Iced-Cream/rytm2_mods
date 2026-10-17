@@ -5,6 +5,12 @@ Port of rytm-mods-src `mods/0013-voice-dac` (MrScruff; hardware-verified there).
 
 GLOBAL > AUDIO ROUTING > DAC SUM (last item): ON routes every voice to the main mix through the DAC. With it on, FILTER pressed twice opens DAC FILTER: a per-voice filter (FRQ, RES, TYP OFF/LP2/LP1/BP/HP1/HP2/BS/PK, DEP), a transient shaper (ATK, SUS) and polarity, after the analog filter. Saved with the project and the sound.
 
+In 1.1 (rytm-mods-src 76ae299, MrScruff's update), with ctrl-all's gesture on the DAC FILTER page:
+TRK + turn with no trig key held steps that knob on every voice track, each within its own limits; TYP
+and POL are set the same on every track (the type the selected track reaches, the same polarity), and
+FUNC + TRK + turn on ATK or SUS moves each track to its own next stop of -64, 0 and +63. It works
+whether ctrl-all is in the build or not.
+
 ## Sites
 
 49 sites, the claims rytm-mods' registry makes for its default build
@@ -86,6 +92,14 @@ table is a `ptr` site.
 4. Listen for glitches on a busy pattern: the filter runs in the audio interrupt, now from the DDR mods area.
 
 ## Results so far
+
+1.1 (MrScruff's update): `.run` 11424 B, 49 sites, 24 relocations; `tools/verify_port.py` against
+rytm-mods-src 76ae299's default build: the re-assembly equals its caves, and 110 of 113 labels match;
+the other three differ only in how an address is named, where two of rytm-mods' sections meet
+(`hpf_state+64` is `bq_coef` here, `bq_on+8` is `bq_cos`, and `dac_rec` ends at a section's end). Not
+yet run on a unit.
+
+1.0:
 
 - Built with elekloader at d17478b and m68k-linux-gnu binutils 2.42: `.run` 11120 B,
   49 sites, 20 relocations; lint OK; links with core-ar2 0.1 and the other ports.

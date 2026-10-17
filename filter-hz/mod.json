@@ -8,9 +8,33 @@
  "description": "The FILTER page's FRQ value popup shows the cutoff frequency to three significant figures (13.8Hz at 0, 440Hz at 60, 21.1kHz at 127) instead of 0..127. Port of rytm-mods 0008-filter-hz.",
  "device": "analog-rytm-mk2",
  "os": "1.73",
- "sources": ["filter-hz.s"],
- "sites": [
-  {"addr": "0x400a8648", "stock": "41ea00142f430020", "op": "jmp", "target": "filter_hz_gate"}
+ "sources": [
+  "filter-hz.s"
  ],
- "requires": ["core"]
+ "sites": [
+  {
+   "addr": "0x400a8648",
+   "stock": "41ea00142f430020",
+   "op": "jmp",
+   "target": "filter_hz_gate"
+  }
+ ],
+ "requires": [
+  "core"
+ ],
+ "ports": {
+  "1.74": {
+   "sources": [
+    "os1.74/filter-hz.s"
+   ],
+   "sites": [
+    {
+     "addr": "0x400a86b4",
+     "stock": "41ea00142f430020",
+     "op": "jmp",
+     "target": "filter_hz_gate"
+    }
+   ]
+  }
+ }
 }

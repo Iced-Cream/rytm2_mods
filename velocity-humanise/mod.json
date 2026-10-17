@@ -46,5 +46,44 @@
  "requires": [
   "core",
   "euclid-accents"
- ]
+ ],
+ "ports": {
+  "1.74": {
+   "sources": [
+    "os1.74/velocity-humanise.s"
+   ],
+   "sites": [
+    {
+     "addr": "0x400378ae",
+     "stock": "246f0010262f001c",
+     "op": "jmp",
+     "target": "velocity_humanise_vel_amount_gate"
+    },
+    {
+     "addr": "0x4009b00c",
+     "stock": "202f003cd7ca",
+     "op": "jmp",
+     "target": "velocity_humanise_vel_humanise"
+    },
+    {
+     "addr": "0x400a8654",
+     "stock": "282f001c266f0018",
+     "op": "jmp",
+     "target": "velocity_humanise_vel_text_gate"
+    },
+    {
+     "addr": "0x400a9004",
+     "stock": "0c81000001d5",
+     "op": "jmp",
+     "target": "velocity_humanise_vel_label_gate"
+    },
+    {
+     "addr": "0x400a8822",
+     "stock": "4eb9400bfd8c",
+     "op": "keep2",
+     "target": "velocity_humanise_vel_get_ui"
+    }
+   ]
+  }
+ }
 }
