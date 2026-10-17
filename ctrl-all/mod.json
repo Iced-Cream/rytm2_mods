@@ -21,5 +21,20 @@
  ],
  "requires": [
   "core"
- ]
+ ],
+ "ports": {
+  "1.74": {
+   "sources": [
+    "os1.74/ctrl-all.s"
+   ],
+   "sites": [
+    {
+     "addr": "0x400378c2",
+     "stock": "20524878ffff",
+     "op": "jmp",
+     "target": "ctrl_all_gate"
+    }
+   ]
+  }
+ }
 }

@@ -52,5 +52,51 @@
  ],
  "requires": [
   "core"
- ]
+ ],
+ "ports": {
+  "1.74": {
+   "sources": [
+    "os1.74/comp-preview.s"
+   ],
+   "sites": [
+    {
+     "addr": "0x4012140c",
+     "stock": "588f428143f98000e508",
+     "op": "jmp",
+     "target": "comp_preview_comp_probe"
+    },
+    {
+     "addr": "0x400cb1ee",
+     "stock": "7201",
+     "op": "bytes",
+     "new": "7202",
+     "kind": "code"
+    },
+    {
+     "addr": "0x400cb1f2",
+     "stock": "203c401e1db4",
+     "op": "keep2",
+     "target": "comp_preview_comp_pages"
+    },
+    {
+     "addr": "0x401e1460",
+     "stock": "4003a544",
+     "op": "ptr",
+     "target": "comp_preview_comp_keys"
+    },
+    {
+     "addr": "0x401e1468",
+     "stock": "400c67b8",
+     "op": "ptr",
+     "target": "comp_preview_comp_draw"
+    },
+    {
+     "addr": "0x401e14b8",
+     "stock": "4003762e",
+     "op": "ptr",
+     "target": "comp_preview_comp_setsel"
+    }
+   ]
+  }
+ }
 }

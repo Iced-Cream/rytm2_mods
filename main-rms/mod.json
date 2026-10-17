@@ -33,5 +33,32 @@
  ],
  "requires": [
   "core"
- ]
+ ],
+ "ports": {
+  "1.74": {
+   "sources": [
+    "os1.74/main-rms.s"
+   ],
+   "sites": [
+    {
+     "addr": "0x401213ca",
+     "stock": "4e924fef0018",
+     "op": "jmp",
+     "target": "main_rms_rms_scan"
+    },
+    {
+     "addr": "0x401e14ec",
+     "stock": "40037a56",
+     "op": "ptr",
+     "target": "main_rms_vol_knob_draw"
+    },
+    {
+     "addr": "0x401e14f0",
+     "stock": "40037c26",
+     "op": "ptr",
+     "target": "main_rms_vol_knob_draw_alt"
+    }
+   ]
+  }
+ }
 }

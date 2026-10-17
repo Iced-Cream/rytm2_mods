@@ -8,9 +8,33 @@
  "description": "Adds SLICE LOOP after SAVE TRACK in the track menu (FUNC + CHRO). On an empty sound track of 16 steps or more it places trigs on steps 1..16, locks trig n's sample START to 6(n-1) and END to 6n, and sets the track's TRIG defaults to SYN off, SMP on. Refuses, changing nothing, on the FX track, a shorter track or a track with any trig. Port of rytm-mods 0012-slice-loop.",
  "device": "analog-rytm-mk2",
  "os": "1.73",
- "sources": ["slice-loop.s"],
- "sites": [
-  {"addr": "0x400f9e96", "stock": "4cef7c7c0018", "op": "jmp", "target": "slice_loop_menu_add"}
+ "sources": [
+  "slice-loop.s"
  ],
- "requires": ["core"]
+ "sites": [
+  {
+   "addr": "0x400f9e96",
+   "stock": "4cef7c7c0018",
+   "op": "jmp",
+   "target": "slice_loop_menu_add"
+  }
+ ],
+ "requires": [
+  "core"
+ ],
+ "ports": {
+  "1.74": {
+   "sources": [
+    "os1.74/slice-loop.s"
+   ],
+   "sites": [
+    {
+     "addr": "0x400f9f02",
+     "stock": "4cef7c7c0018",
+     "op": "jmp",
+     "target": "slice_loop_menu_add"
+    }
+   ]
+  }
+ }
 }

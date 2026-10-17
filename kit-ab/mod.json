@@ -39,5 +39,38 @@
  ],
  "requires": [
   "core"
- ]
+ ],
+ "ports": {
+  "1.74": {
+   "sources": [
+    "os1.74/kit-ab.s"
+   ],
+   "sites": [
+    {
+     "addr": "0x400cd51a",
+     "stock": "4eb9400af13e",
+     "op": "keep2",
+     "target": "kit_ab_toggle"
+    },
+    {
+     "addr": "0x400cd542",
+     "stock": "4879402561d6",
+     "op": "keep2",
+     "target": "kit_ab_kab_msg"
+    },
+    {
+     "addr": "0x400dd64a",
+     "stock": "4eb9400af13e",
+     "op": "keep2",
+     "target": "kit_ab_toggle"
+    },
+    {
+     "addr": "0x400dd652",
+     "stock": "487940257bde",
+     "op": "keep2",
+     "target": "kit_ab_kab_msg"
+    }
+   ]
+  }
+ }
 }
