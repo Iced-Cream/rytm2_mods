@@ -1,16 +1,25 @@
 {
  "id": "ctrl-all",
- "version": "1.0",
+ "version": "1.1",
  "title": "CTRL ALL: TRK + knob on every track",
  "category": "Performance",
  "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
  "license": "GPL-2.0-only",
- "description": "Holding TRK while turning a knob on a sound or TRIG page applies the same step to that parameter on tracks 1..12, keeping their differences. Stock behaviour with the FX track selected, with a trig key held, or on FX and global pages. Port of rytm-mods 0014-ctrl-all.",
+ "description": "Holding TRK while turning a knob on a sound or TRIG page applies the same step to that parameter on tracks 1..12, keeping their differences. On the SYNTH page each track takes its own machine's parameter in the same knob position, within that parameter's range, and a track whose machine has none there is left alone; FILTER TYP sets every track to the type the selected track reaches. Stock behaviour with the FX track selected, with a trig key held, or on FX and global pages. Port of rytm-mods 0014-ctrl-all.",
  "device": "analog-rytm-mk2",
  "os": "1.73",
- "sources": ["ctrl-all.s"],
- "sites": [
-  {"addr": "0x400378c2", "stock": "20524878ffff", "op": "jmp", "target": "ctrl_all_gate"}
+ "sources": [
+  "ctrl-all.s"
  ],
- "requires": ["core"]
+ "sites": [
+  {
+   "addr": "0x400378c2",
+   "stock": "20524878ffff",
+   "op": "jmp",
+   "target": "ctrl_all_gate"
+  }
+ ],
+ "requires": [
+  "core"
+ ]
 }
