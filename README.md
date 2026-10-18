@@ -70,8 +70,11 @@ nothing if any address fails its check. Run it again after changing a 1.73 sourc
 builds the port when given the 1.74 stock file, as `<id>-<version>-os1.74.elemod`.
 
 Checked with both stock files: core-ar2 with all eleven ports, built for each, changes the same
-instructions at the same (moved) sites, and the mods' code differs only in the 194 firmware
-addresses it names, each the moved one.
+instructions at the same (moved) sites, and the mods' code differs only in the firmware
+addresses it names, each the moved one. A word in the mods' code that holds a 1.73 address
+whose 1.74 address differs, left unmoved, is a port error: the include once kept two vtable
+addresses tagged `const` (ctrl-all's set checks) at their 1.73 values, which made TRK + turn
+reach only the selected track on 1.74.
 
 ## Build
 

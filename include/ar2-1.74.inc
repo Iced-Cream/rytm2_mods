@@ -234,8 +234,8 @@
         .equ    pattern_grid_view_vtable, 0x401cc92c   | data, verified
         .equ    microtiming_label_table, 0x401cdb1c   | data, verified
         .equ    parameter_set_vtables, 0x401dcda8   | data, verified
-        .equ    SOUND_PARAM_SET_VT, 0x401dcb74   | const, verified
-        .equ    TRIG_PARAM_SET_VT, 0x401dcc6c   | const, verified
+        .equ    SOUND_PARAM_SET_VT, 0x401dce24   | const, verified
+        .equ    TRIG_PARAM_SET_VT, 0x401dcf1c   | const, verified
         .equ    comp_view_knob_draw, 0x401e14ec   | data, verified
         .equ    params_seq_note_view_vtable, 0x401e3148   | data, verified
         .equ    track_selection_view_vtable, 0x401e39a0   | data, verified

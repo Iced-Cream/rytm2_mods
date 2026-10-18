@@ -267,8 +267,9 @@ def main(stock173, stock174):
     lines = []
     for line in inc.split('\n'):
         m = re.match(r'(\s+\.equ\s+\w+,\s+)0x([0-9a-f]{8})(\s+\|\s+(\w+),.*)', line)
-        if m and m.group(4) != 'const':
-            v = int(m.group(2), 16)
+        v = int(m.group(2), 16) if m else 0
+        # a constant is moved only when it is an address into the image (a vtable's)
+        if m and (m.group(4) != 'const' or M.img(v)):
             try:
                 nv, _ = M(v)
                 line = '%s0x%08x%s' % (m.group(1), nv, m.group(3))
