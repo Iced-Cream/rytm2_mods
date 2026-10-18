@@ -5,8 +5,10 @@ Port of rytm-mods-src `mods/0014-ctrl-all` (MrScruff; hardware-verified there).
 Hold TRK and turn a knob on a sound page (SYNTH, SAMPLE, FILTER, AMP, LFO) or the TRIG page: the
 same step goes to that parameter on all twelve sound tracks, so their differences are kept and each
 track stops at its own limits. On the SYNTH page each track takes its own machine's parameter in the
-same knob position, within that parameter's range; a track whose machine has none there is left
-alone. FILTER TYP is the exception: the selected track's type changes as usual and every other
+same parameter slot (the machine's synth parameters in MIDI CC order, CC 16..23), within that
+parameter's range; a track whose machine has none there is left alone. The slot is not always the
+knob's place on the screen: with BD HARD on one track and SD HARD on another, Hold Time moves Sweep
+Depth (both CC 19) and Sweep Time moves Tick Level (both CC 20). FILTER TYP is the exception: the selected track's type changes as usual and every other
 track is set to the same type. Stock behaviour (selected track only) with the FX
 track selected, while a trig key is held (so parameter locks stay on one track), and on FX or global
 pages.
@@ -39,7 +41,8 @@ before this gate.
 1. FILTER page: note FRQ on two tracks. On one, hold TRK and turn FRQ: the other track's FRQ moves by
    the same amount. The FILTER, AMP, LFO, SAMPLE and TRIG pages do not depend on the machine.
 2. SYNTH page: give two tracks different machines, hold TRK and turn a SYNTH knob: each moves its own
-   parameter in that position, within its own range; a track whose machine has none there stays.
+   parameter in the same slot (MIDI CC order), within its own range; a track whose machine has none
+   there stays.
 3. FILTER page: hold TRK and turn TYP: every track takes the type the selected track reaches.
 4. With the FX track selected, or with a trig key held, only the selected track changes.
 
@@ -47,7 +50,15 @@ before this gate.
 
 1.1 (MrScruff's update): `.run` 420 B, 1 site, no relocations; `tools/verify_port.py` against
 rytm-mods-src 76ae299's default build: the re-assembly equals its caves (.text 0x40029838+118, .typ
-0x40029950+306) and all 4 labels match. Not yet run on a unit.
+0x40029950+306) and all 4 labels match.
+
+- Hardware, OS 1.74 (2026-10-18), core-ar2 with filter-hz, ctrl-all, env-reset-amp, slice-loop,
+  main-rms, lfo-rnd, comp-preview and kit-ab: tests 1, 3 and 4 as described. Test 2 with BD HARD
+  (track 1) and SD HARD (track 2): Tune, Decay and Level follow each other, and the rest pair by
+  slot as above (Sweep Time with Tick Level, Snap Amount with Noise Decay, Waveform with Noise
+  Level, Hold Time with Sweep Depth, Tick Level with Sweep Time).
+- rytm-emu (c5732f0), the same build for 1.73 and 1.74: FILTER, TYP and SYNTH page screens
+  pixel-identical between the two.
 
 1.0:
 
