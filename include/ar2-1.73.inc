@@ -24,6 +24,7 @@
         .equ    sound_param_id_for_index, 0x40007028   | fn, verified
         .equ    machine_available, 0x400070e6   | fn, verified
         .equ    machine_home_track, 0x40007116   | fn, verified
+        .equ    param_machine, 0x4000714a   | fn, verified
         .equ    track_physical_voice_get, 0x4000716e   | fn, verified
         .equ    sound_load, 0x400081f6   | fn, verified
         .equ    sound_save, 0x4000843a   | fn, verified
@@ -157,6 +158,7 @@
         .equ    param_info_resume, 0x400ff560   | data, verified
         .equ    page_info, 0x400ff574   | fn, verified
         .equ    page_info_resume, 0x400ff57a   | data, verified
+        .equ    synth_page_knob_table, 0x400ff59a   | fn, verified
         .equ    lfo_dst_knob_draw, 0x400ff9fc   | fn, verified
         .equ    audio_dsp_region, 0x40100000   | data, inferred
         .equ    static_ctors_run, 0x40100682   | fn, verified
