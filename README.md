@@ -119,7 +119,7 @@ keep it, and the `out/` build folders, out of git and out of any upload.
 | 0000-shared | `shared/shared.s` | built | ported (included by velocity-humanise, lfo-rnd, voice-dac) |
 | 0008-filter-hz | `filter-hz/` | hardware-verified | matches label by label; **confirmed on a unit** |
 | 0012-slice-loop | `slice-loop/` | hardware-verified | matches label by label; **confirmed on a unit** |
-| 0014-ctrl-all | `ctrl-all/` | hardware-verified | 1.1, MrScruff's update (76ae299): matches label by label; 1.0 **confirmed on a unit**, 1.1 **confirmed on a unit** on OS 1.74 |
+| 0014-ctrl-all | `ctrl-all/` | hardware-verified | 1.2, MrScruff's SYNTH knob fix (9831bdf): matches label by label, **confirmed on a unit** on OS 1.74; 1.0 and 1.1 **confirmed on a unit** |
 | 0015-env-reset-amp | `env-reset-amp/` | hardware-verified | bit probe left out; matches label by label; **confirmed on a unit** |
 | 0002-euclid-accents | `euclid-accents/` | hardware-verified | matches label by label; **confirmed on a unit** |
 | 0003-velocity-humanise | `velocity-humanise/` | built (MANUAL: verified) | needs euclid-accents; matches label by label; **confirmed on a unit** |
