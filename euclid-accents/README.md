@@ -3,23 +3,19 @@
 Port of rytm-mods-src `mods/0002-euclid-accents` (MrScruff; hardware-verified there). Full usage: rytm-mods-src
 `docs/MANUAL.md`, section 0002.
 
-On the euclidean page (TRIG pressed twice), Bool Operator (OP) has eight values instead of four: OR, XOR, AND, SUB as stock, then OR\*, XOR\*, AND\*, SUB\* (the same glyph with a dot). In accent mode the euclidean generator no longer decides which steps play: only the grid's trigs play, and a trig on a step where the euclidean pattern has a hit plays accented. Hand-set accents stay. Turning euclid off with FUNC held bakes the accents into the pattern; without FUNC the pattern is left as it was. Per track, saved with the pattern; on stock firmware such a track loads with euclid off.
+On the euclidean page (TRIG pressed twice), Bool Operator (OP) has eight values instead of four: OR, XOR, AND, SUB as stock, then OR\*, XOR\*, AND\*, SUB\* (the same glyph with a dot). In accent mode the euclidean generator no longer decides which steps play: only the grid's trigs play, and a trig on a step where the euclidean pattern has a hit plays accented. Hand-set accents stay. Turning euclid off with FUNC held bakes the accents into the pattern; without FUNC the pattern is left as it was. Per track, kept with the pattern in core-ar2 0.2's mod storage (needs core 0.2). A project saved with this mod opens on stock firmware with the accent track playing as plain euclid with its base operator (OR\* as OR, and so on): stock sees EUC on and the base operator, and never the accent flag. (README 1.0 said such a track loads with euclid off; by the stock load code it does not, in 1.0 either.)
 
 ## Sites
 
-17 sites, the claims rytm-mods' registry makes for its default build
-(`registry/allocations.toml`, owner `0002-euclid-accents`); the diagnostic `probe_range` detour at 0x400ff556 is left out:
+13 sites (OS 1.73 addresses; 1.74's are in mod.json `ports`), the claims rytm-mods' registry makes for its default build
+(`registry/allocations.toml`, owner `0002-euclid-accents`) less the four 1.1 dropped (below); the diagnostic `probe_range` detour at 0x400ff556 is left out:
 
 | addr | op | |
 |---|---|---|
-| 0x40008cc4 | jmp | `jmp euclid_accents_pattern_load_accent` |
-| 0x40008f62 | jmp | `jmp euclid_accents_pattern_save_accent` |
 | 0x400378a6 | jmp | `jmp euclid_accents_param_delta_gate` |
-| 0x4009aaca | jmp | `jmp euclid_accents_trig_fire_euclid_masked` |
+| 0x4009aaca | jmp | `jmp euclid_accents_trig_fire_euclid_gate` |
 | 0x4009ab72 | jmp | `jmp euclid_accents_trig_fire_accent` |
 | 0x400a85e0 | jmp | `jmp euclid_accents_boolop_text_gate` |
-| 0x400c0e02 | jmp | `jmp euclid_accents_euclid_enabled_get_masked` |
-| 0x400c0e32 | jmp | `jmp euclid_accents_euclid_enabled_set_keep` |
 | 0x400c3c0e | jmp | `jmp euclid_accents_euclid_bake_gate` |
 | 0x400a884c | keep2 | the instruction's address operand -> `euclid_accents_boolop_get_ui` (stock `4eb9400c11b0`) |
 | 0x400a9caa | keep2 | the instruction's address operand -> `euclid_accents_boolop_set_ui` (stock `4eb9400c11e0`) |
@@ -37,6 +33,36 @@ table is a `ptr` site.
 
 ## Changes from rytm-mods
 
+### 1.1: the accent flag in core-ar2 0.2's mod storage
+
+In rytm-mods (and 1.0 here) the accent flag was bit 1 of the track's euclid-enable byte
+(live TrackPattern +0x2ca), so an accent track's byte read 3. Four sites existed only to keep stock
+code from seeing that: a masked `euclid_enabled_get` (0x400c0e02), an `euclid_enabled_set` that kept
+the other bits (0x400c0e32), and hooks in `pattern_track_save`/`pattern_track_load` (0x40008f62,
+0x40008cc4) that carried bits 1..5 in spare bits 2..6 of the stored track's byte +0x279.
+
+1.1 keeps the flag in a core storage field instead (mod.json `"storage": [{"sym": "euclid_accent",
+"scope": "track", "bits": 1}]`, `"resources": {"core": "0.2"}`), read and written with
+`core_store_get`/`core_store_set` (item: the live pattern, index: the track):
+
+- the four sites above are gone; the euclid-enable byte is stock's again and only ever 0 or 1, and the
+  stored byte +0x279 has bits 2..6 clear, as the stock save writes them;
+- `boolop_get_ui`, `boolop_set_ui` and the bake gate get the live track from the accessor's
+  `vtable[0x28]` as before and turn it into (live pattern, track) with `track_item`
+  (`../shared/live-track.s`): live pattern k = 0x407c89e3 + 85760·k (k 0..128), track t at +917·t,
+  checked for range and stride, so any other pointer reads 0 and writes nothing. The emulator shows the
+  accessor returns live pattern idx+1 (pattern A01 is k = 1, A02 k = 2);
+- `boolop_set_ui` now writes the accent before calling the stock operator setter, so the
+  notification that setter always raises follows both changes;
+- trig_fire's euclid test (0x4009aaca) stays as a site with a new job,
+  `trig_fire_euclid_gate`: with the byte at 1 the stock test would now take the euclid path, so when
+  the accent field is set the byte read is answered as 0 and the track takes the grid path, as a raw 3
+  did before. `trig_fire_accent` tests `byte & 1` and the field (track = a3 / 917, item = a2);
+- projects saved with 1.0 load with every accent cleared (OP shows the base operator): their flags are in
+  the stored byte's bits 2..6, which nothing reads now. The next save of the pattern clears those bits.
+
+### 1.0
+
 - Generated by `tools/port_mod.py`. The code is unchanged; each label a site names gets a
   `.globl` alias carrying the mod id on the line before it, and the stub keeps using its own
   local labels.
@@ -50,8 +76,27 @@ table is a `ptr` site.
 1. TRIG, TRIG again for EUCLIDEAN, EUC on, turn OP fully right: OR\* .. SUB\*.
 2. With OR\* and a few grid trigs, play: only grid trigs play; those on euclid hits are accented.
 3. FUNC + EUC off: the accents are written into the pattern. Save, power-cycle, reload: OP keeps its accent value.
+4. With an accent operator: EUC on stays on (the stock enable is untouched), the track plays only its grid trigs.
+   OP back to a plain operator: euclid generates the trigs again.
 
 ## Results so far
+
+### 1.1
+
+- Built with elekloader (core-ar2 0.2) for OS 1.73 and 1.74: `.run` 1448 B, 13 sites, 10 relocations,
+  imports `core_store_get`, `core_store_set`, `euclid_accent`; lint OK with core 0.2 alone and with
+  velocity-humanise 1.1.
+- rytm-emu, core 0.2 + euclid-accents 1.1 + velocity-humanise 1.1, OS 1.73 and 1.74 (same results on both):
+  on pattern A01, track SD, EUC on and OP turned to OR\*: the field reads 1 at live pattern 1, track 1
+  (home byte 0x80), every other track and pattern 0, euclid-enable byte 1, operator byte 0. On A02,
+  track CB: the fields land at live pattern 2, track 11. Playing (a build with counters added to
+  the stub, not shipped): every SD trig on a euclid hit took the accent arm, and trig_fire's euclid path
+  ran 0 times with EUC on; OP back to SUB: field 0, euclid path taken again (80 times), no more accents.
+- Not yet on hardware. Persistence: see the velocity-humanise README; under core-ar2 0.2 the field reaches
+  the project's store only when a whole pattern is serialized (a project save), not through the per-track
+  saves stock makes after each edit.
+
+### 1.0
 
 - Built with elekloader at d17478b and m68k-linux-gnu binutils 2.42: `.run` 1436 B,
   17 sites, 4 relocations; lint OK; links with core-ar2 0.1 and the other ports.

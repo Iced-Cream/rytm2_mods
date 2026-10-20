@@ -1,29 +1,17 @@
 {
  "id": "euclid-accents",
- "version": "1.0",
+ "version": "1.1",
  "title": "Euclidean accents",
  "category": "Sequencer",
  "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
  "license": "GPL-2.0-only",
- "description": "Per track, the euclidean generator colours the pattern's own trigs with ACCENT instead of deciding which steps fire: the grid says when, euclid says what is accented. Bool Operator's range grows from OR, XOR, AND, SUB to eight values, each operator with an accent variant, so the setting is per track and saved with the pattern. Live behaviour, the FUNC-held bake and the plain revert are kept. Port of rytm-mods 0002-euclid-accents.",
+ "description": "Per track, the euclidean generator colours the pattern's own trigs with ACCENT instead of deciding which steps fire: the grid says when, euclid says what is accented. Bool Operator's range grows from OR, XOR, AND, SUB to eight values, each operator with an accent variant, so the setting is per track and saved with the pattern, in core-ar2's mod storage. Live behaviour, the FUNC-held bake and the plain revert are kept. Port of rytm-mods 0002-euclid-accents.",
  "device": "analog-rytm-mk2",
  "os": "1.73",
  "sources": [
   "euclid-accents.s"
  ],
  "sites": [
-  {
-   "addr": "0x40008cc4",
-   "stock": "d08091804480",
-   "op": "jmp",
-   "target": "euclid_accents_pattern_load_accent"
-  },
-  {
-   "addr": "0x40008f62",
-   "stock": "712a02caef88",
-   "op": "jmp",
-   "target": "euclid_accents_pattern_save_accent"
-  },
   {
    "addr": "0x400378a6",
    "stock": "4feffff448d7040c",
@@ -34,7 +22,7 @@
    "addr": "0x4009aaca",
    "stock": "102802ca43f37a00",
    "op": "jmp",
-   "target": "euclid_accents_trig_fire_euclid_masked"
+   "target": "euclid_accents_trig_fire_euclid_gate"
   },
   {
    "addr": "0x4009ab72",
@@ -47,18 +35,6 @@
    "stock": "4fefffec48d70c1c",
    "op": "jmp",
    "target": "euclid_accents_boolop_text_gate"
-  },
-  {
-   "addr": "0x400c0e02",
-   "stock": "2f0a246f0008",
-   "op": "jmp",
-   "target": "euclid_accents_euclid_enabled_get_masked"
-  },
-  {
-   "addr": "0x400c0e32",
-   "stock": "598f2f0e2f0a",
-   "op": "jmp",
-   "target": "euclid_accents_euclid_enabled_set_keep"
   },
   {
    "addr": "0x400c3c0e",
@@ -119,27 +95,25 @@
    "target": "euclid_accents_bitmapset8"
   }
  ],
+ "storage": [
+  {
+   "sym": "euclid_accent",
+   "scope": "track",
+   "bits": 1
+  }
+ ],
  "requires": [
   "core"
  ],
+ "resources": {
+  "core": "0.2"
+ },
  "ports": {
   "1.74": {
    "sources": [
     "os1.74/euclid-accents.s"
    ],
    "sites": [
-    {
-     "addr": "0x40008cc4",
-     "stock": "d08091804480",
-     "op": "jmp",
-     "target": "euclid_accents_pattern_load_accent"
-    },
-    {
-     "addr": "0x40008f62",
-     "stock": "712a02caef88",
-     "op": "jmp",
-     "target": "euclid_accents_pattern_save_accent"
-    },
     {
      "addr": "0x400378a6",
      "stock": "4feffff448d7040c",
@@ -150,7 +124,7 @@
      "addr": "0x4009ab36",
      "stock": "102802ca43f37a00",
      "op": "jmp",
-     "target": "euclid_accents_trig_fire_euclid_masked"
+     "target": "euclid_accents_trig_fire_euclid_gate"
     },
     {
      "addr": "0x4009abde",
@@ -163,18 +137,6 @@
      "stock": "4fefffec48d70c1c",
      "op": "jmp",
      "target": "euclid_accents_boolop_text_gate"
-    },
-    {
-     "addr": "0x400c0e6e",
-     "stock": "2f0a246f0008",
-     "op": "jmp",
-     "target": "euclid_accents_euclid_enabled_get_masked"
-    },
-    {
-     "addr": "0x400c0e9e",
-     "stock": "598f2f0e2f0a",
-     "op": "jmp",
-     "target": "euclid_accents_euclid_enabled_set_keep"
     },
     {
      "addr": "0x400c3c7a",

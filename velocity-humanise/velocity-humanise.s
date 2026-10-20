@@ -5,20 +5,22 @@
         |
         | Mod 0003 - velocity humanise.
         |
-        | The amount is a 4-bit index in bits 2..5 of the track's euclid-enable
-        | byte (TrackPattern +0x2ca). Mod 0002 owns that byte: it saves bits 1..5,
-        | and masks every euclid read to bits 0..1, so these bits change nothing
-        | else. Bits 6..7 of the byte are never set - stock writes 0/1, 0002's load
-        | fills bits 1..5 only - so byte >> 2 is the index without masking.
+        | The amount is a 4-bit index, 0..15, into shared_amounts.
+        |
+        | elemod 1.1: the index is a core-ar2 0.2 mod storage field (mod.json
+        | "storage": vel_rnd, scope track, 4 bits), read and written through
+        | core_store_get/core_store_set with (live pattern, track). In rytm-mods it
+        | was bits 2..5 of the track's euclid-enable byte (TrackPattern +0x2ca),
+        | which only 0002-euclid-accents' save, load and mask sites kept safe and
+        | stored; core keeps it now, so this mod no longer needs euclid-accents.
 
         .include "../include/ar2-1.73.inc"
+        | elemod: live track -> (live pattern, track), for core's track field
+        .include "../shared/live-track.s"
 
         | elemod: rytm-mods' default build params, as its build passed them
         .equ    P_DIAG_CANARY, 0
 
-        .equ    OFF_EUCLID_ENABLED, 0x2ca
-        .equ    AMOUNT_SHIFT,       2
-        .equ    AMOUNT_MASK,        0x3c          | bits 2..5 of the byte
         .equ    AMOUNT_MAX,         15
         .equ    PARAM_ID_VEL,       30
         .equ    VT_STORAGE,         0x28
@@ -36,10 +38,13 @@
         | has none. trig_fire stores d0 << 8 and the low word of %sp@(72) into the
         | trig event straight after the resume point, so both are updated here.
         |
-        | d1 and a0 are both reloaded before they are next read in trig_fire
-        | (0x4009afa6..0x4009afe4); d3 (the step) and d5 are not touched. shared_rnd
-        | clobbers d0 as well, which still holds the velocity here, so it is parked
-        | across the call.
+        | d1, a0 and a1 are all reloaded before they are next read in trig_fire
+        | (0x4009afa6..0x4009afee); d3 (the step) and d5 are not touched. shared_rnd
+        | and core_store_get clobber d0 as well, which still holds the velocity
+        | here, so it is parked across the calls.
+        |
+        | elemod: a2 is the live pattern trig_fire plays (LIVE_PAT(p + 1)), so the
+        | track is (a3 - a2) / 917.
         | ------------------------------------------------------------------
         .align  2
         .globl  velocity_humanise_vel_humanise
@@ -47,8 +52,19 @@ velocity_humanise_vel_humanise:
 vel_humanise:
         move.l  %sp@(60),%d0                      | displaced
         addal   %a2,%a3                           | displaced: a3 = track base
-        mvzb    OFF_EUCLID_ENABLED(%a3),%d1
-        lsr.l   #AMOUNT_SHIFT,%d1                 | index, 0..15
+        move.l  %d0,-(%sp)                        | elemod: the velocity, across the call
+        move.l  %a3,%d1
+        sub.l   %a2,%d1
+        divu.w  #LIVE_TRK_SIZE,%d1                | < 13 * 917: the quotient fits
+        andi.l  #0xffff,%d1
+        move.l  %d1,-(%sp)                        | index: the track
+        move.l  %a2,-(%sp)                        | item: the live pattern
+        move.l  #vel_rnd,-(%sp)                   | field
+        jsr     core_store_get
+        lea     12(%sp),%sp
+        move.l  %d0,%d1                           | index, 0..15
+        move.l  (%sp)+,%d0
+        tst.l   %d1
         beq.s   9f
         lea     shared_amounts,%a0
         mvzb    %a0@(0,%d1:l),%d1                 | N
@@ -131,10 +147,11 @@ mark_changed:
         | %sp@(20) is the parameter id, %sp@(24) the delta in 8.8 and %sp@(28) the
         | FUNC-held flag. Anything else continues into stock unchanged.
         |
-        | The write goes straight into the envelope byte, so the change
-        | notification that stock raises alongside its own write of that byte is
-        | raised here too: without it the edit is not a change the track carries
-        | into storage.
+        | The write goes to core's field (elemod; in rytm-mods, straight into the
+        | euclid-enable byte), so the change notification that stock raises
+        | alongside its own write of that byte is raised here too: without it the
+        | edit is not a change the pattern carries into storage, which is when
+        | core copies the field into the project's store.
         | ------------------------------------------------------------------
         .align  2
         .globl  velocity_humanise_vel_amount_gate
@@ -151,12 +168,17 @@ vel_amount_gate:
         beq.s   7f
         bsr.s   track_bytes
         beq.s   7f
-        move.l  %d0,%a2
-        mvzb    OFF_EUCLID_ENABLED(%a2),%d3
-        moveq   #AMOUNT_MASK,%d1
-        and.l   %d3,%d1                           | old field, in place
-        move.l  %d1,%d0
-        lsr.l   #AMOUNT_SHIFT,%d0
+        move.l  %a0,-(%sp)                        | elemod: the accessor, across the calls
+        move.l  %d0,%a0
+        bsr.w   track_item                        | a0 = live pattern, d0 = track
+        bmi.s   6f
+        move.l  %a0,%a2                           | d2/d3/a2 are the prologue's to use
+        move.l  %d0,%d3
+        move.l  %d3,-(%sp)                        | index
+        move.l  %a2,-(%sp)                        | item
+        move.l  #vel_rnd,-(%sp)                   | field
+        jsr     core_store_get
+        lea     12(%sp),%sp
         add.l   %d2,%d0
         bpl.s   1f
         clr.l   %d0
@@ -164,11 +186,15 @@ vel_amount_gate:
         cmp.l   %d2,%d0
         ble.s   2f
         move.l  %d2,%d0
-2:      lsl.l   #AMOUNT_SHIFT,%d0
-        eor.l   %d1,%d3                           | clear the old field
-        or.l    %d0,%d3
-        move.b  %d3,OFF_EUCLID_ENABLED(%a2)
-        bsr.w   mark_changed                      | a0 still holds the accessor
+2:      move.l  %d0,-(%sp)                        | value
+        move.l  %d3,-(%sp)                        | index
+        move.l  %a2,-(%sp)                        | item
+        move.l  #vel_rnd,-(%sp)                   | field
+        jsr     core_store_set
+        lea     16(%sp),%sp
+        move.l  (%sp),%a0                         | the accessor
+        bsr.w   mark_changed
+6:      addq.l  #4,%sp                            | the accessor
 7:      movem.l (%sp),%d2-%d3/%a2                 | param_apply_delta's epilogue
         lea     12(%sp),%sp
         rts
@@ -200,9 +226,16 @@ vel_get_ui:
         bsr.w   track_bytes
         beq.s   9f
         move.l  %d0,%a0
-        mvzb    OFF_EUCLID_ENABLED(%a0),%d0
-        lsr.l   #AMOUNT_SHIFT,%d0                 | index, 0..15
-        lea     shared_stops,%a0
+        bsr.w   track_item                        | elemod: a0 = live pattern, d0 = track
+        bmi.s   8f
+        move.l  %d0,-(%sp)                        | index
+        move.l  %a0,-(%sp)                        | item
+        move.l  #vel_rnd,-(%sp)                   | field
+        jsr     core_store_get                    | index, 0..15
+        lea     12(%sp),%sp
+        bra.s   7f
+8:      clr.l   %d0                               | not a live pattern track: 0
+7:      lea     shared_stops,%a0
         mvzb    %a0@(0,%d0:l),%d0                 | the setting's stop
         .if     P_DIAG_CANARY
         | DIAGNOSTIC: answer a count instead of N.

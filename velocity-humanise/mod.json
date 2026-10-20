@@ -1,11 +1,11 @@
 {
  "id": "velocity-humanise",
- "version": "1.0",
+ "version": "1.1",
  "title": "Random velocity per track",
  "category": "Sequencer",
  "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
  "license": "GPL-2.0-only",
- "description": "Per track, every trig's velocity gets a random offset of up to +-N, clamped to 1..127. N is one of 16 steps (0 to 64), set with FUNC + the VEL knob on the TRIG page, where the knob becomes a sixteen-position selector and the label reads RND. Stored with the pattern beside VEL. Needs euclid-accents, which keeps the bits it is stored in. Port of rytm-mods 0003-velocity-humanise.",
+ "description": "Per track, every trig's velocity gets a random offset of up to +-N, clamped to 1..127. N is one of 16 steps (0 to 64), set with FUNC + the VEL knob on the TRIG page, where the knob becomes a sixteen-position selector and the label reads RND. Stored with the pattern, in core-ar2's mod storage. Port of rytm-mods 0003-velocity-humanise.",
  "device": "analog-rytm-mk2",
  "os": "1.73",
  "sources": [
@@ -43,10 +43,19 @@
    "target": "velocity_humanise_vel_get_ui"
   }
  ],
- "requires": [
-  "core",
-  "euclid-accents"
+ "storage": [
+  {
+   "sym": "vel_rnd",
+   "scope": "track",
+   "bits": 4
+  }
  ],
+ "requires": [
+  "core"
+ ],
+ "resources": {
+  "core": "0.2"
+ },
  "ports": {
   "1.74": {
    "sources": [
