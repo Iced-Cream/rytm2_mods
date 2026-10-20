@@ -64,7 +64,14 @@ setter and trig_fire mask) and saved them (its pattern track save/load hooks), h
 
 ## Results so far
 
-### 1.1
+### 1.1 on core-ar2 0.3
+
+- Needs core-ar2 0.3 (`resources.core`), which saves track and pattern fields on stock's per-part
+  saves; with 0.2 the field was lost at a power-off without a project save (below). Core 0.3 is
+  OS 1.74 only, so 1.1 builds for 1.74 only; the 1.73 source stays the porting master.
+- Hardware, Analog Rytm MKII OS 1.74, 2026-10-20, core 0.3 with all eleven mods (C3A4): test steps 1 to 3 pass, N kept through a power-cycle without SAVE PROJECT; step 4 passes on the same build without euclid-accents (C3N4).
+
+### 1.1 (core-ar2 0.2)
 
 - Built with elekloader (core-ar2 0.2) for OS 1.73 and 1.74: `.run` 828 B, 5 sites, 8 relocations, imports
   `core_store_get`, `core_store_set`, `vel_rnd`; lint OK with core 0.2 alone and with euclid-accents 1.1.
@@ -78,8 +85,7 @@ setter and trig_fire mask) and saved them (its pattern track save/load hooks), h
   core does not hook, so the field is not in the stored project's tagged store after an edit or a pattern
   change, and a power cycle (which keeps the stored project) brings it back as 0, while the stock fields of
   the same track are kept. A project save (SETTINGS > PROJECT > SAVE PROJECT AS) runs the whole-pattern
-  serializer, which core does hook. Needs a core fix (hook 0x400bf7ac or `pattern_track_save`) before
-  release.
+  serializer, which core does hook. Fixed in core-ar2 0.3.
 
 ### 1.0
 

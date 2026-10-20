@@ -81,7 +81,14 @@ the other bits (0x400c0e32), and hooks in `pattern_track_save`/`pattern_track_lo
 
 ## Results so far
 
-### 1.1
+### 1.1 on core-ar2 0.3
+
+- Needs core-ar2 0.3 (`resources.core`), which saves track and pattern fields on stock's per-part
+  saves; with 0.2 the field was lost at a power-off without a project save (below). Core 0.3 is
+  OS 1.74 only, so 1.1 builds for 1.74 only; the 1.73 source stays the porting master.
+- Hardware, Analog Rytm MKII OS 1.74, 2026-10-20, core 0.3 with all eleven mods (C3A4): test steps 1 to 4 pass, and OP is kept through a power-cycle without SAVE PROJECT.
+
+### 1.1 (core-ar2 0.2)
 
 - Built with elekloader (core-ar2 0.2) for OS 1.73 and 1.74: `.run` 1448 B, 13 sites, 10 relocations,
   imports `core_store_get`, `core_store_set`, `euclid_accent`; lint OK with core 0.2 alone and with
@@ -92,7 +99,7 @@ the other bits (0x400c0e32), and hooks in `pattern_track_save`/`pattern_track_lo
   track CB: the fields land at live pattern 2, track 11. Playing (a build with counters added to
   the stub, not shipped): every SD trig on a euclid hit took the accent arm, and trig_fire's euclid path
   ran 0 times with EUC on; OP back to SUB: field 0, euclid path taken again (80 times), no more accents.
-- Not yet on hardware. Persistence: see the velocity-humanise README; under core-ar2 0.2 the field reaches
+- Not on hardware with 0.2. Persistence: see the velocity-humanise README; under core-ar2 0.2 the field reaches
   the project's store only when a whole pattern is serialized (a project save), not through the per-track
   saves stock makes after each edit.
 

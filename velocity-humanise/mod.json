@@ -54,7 +54,7 @@
   "core"
  ],
  "resources": {
-  "core": "0.2"
+  "core": "0.3"
  },
  "ports": {
   "1.74": {
