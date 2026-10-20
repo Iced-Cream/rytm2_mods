@@ -137,9 +137,17 @@ table is a `ptr` site.
 
 ## Results so far
 
+1.2 builds for OS 1.74 only: it needs core-ar2 0.3, which has no 1.73 port. Its 1.73 source stays
+the porting master, as for every mod here (`tools/port_os.py`).
+
+Hardware, Analog Rytm MKII OS 1.74, 2026-10-20, core-ar2 0.3 with all eleven mods: test steps 1 to 8
+pass. DAC FILTER values are kept through kit save and reload, a power-cycle without a kit save, the
++Drive sound library, and a kit sent and received by SysEx and by Overbridge. The VELOCITY and
+AFTERTOUCH menus behave as on stock with voice-dac's values in the route bytes.
+
 1.2 (core-ar2 0.3 storage), 2026-10-20: `.run` 10864 B, 34 sites, 36 relocations, imports
-`core_store_get`, `core_store_set`, `vd_flt`, `vd_shp`, `vd_dac`; lint OK with core-ar2 0.3 on 1.73
-and 1.74, also together with lfo-rnd 1.1 (core 0.3 > lfo-rnd 1.1 > voice-dac 1.2; the lockfile puts
+`core_store_get`, `core_store_set`, `vd_flt`, `vd_shp`, `vd_dac`; lint OK with core-ar2 0.3 on 1.74 (and
+on 1.73 before core 0.3 dropped 1.73), also together with lfo-rnd 1.1 (core 0.3 > lfo-rnd 1.1 > voice-dac 1.2; the lockfile puts
 lfo_rnd_cfg at sound bits 0..15, vd_flt at 16..39, vd_shp at 40..54: 55 of 56); with core 0.2 lint
 refuses it (needs 0.3). In rytm-emu (dtboot/dtpeek), each on 1.73 and 1.74, with and without lfo-rnd
 1.1:
