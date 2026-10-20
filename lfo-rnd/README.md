@@ -3,7 +3,48 @@
 Port of rytm-mods-src `mods/0004-lfo-rnd` (MrScruff; `built` in its mod.toml, listed as verified on hardware in its MANUAL there). Full usage: rytm-mods-src
 `docs/MANUAL.md`, section 0004.
 
-A second LFO page, LFO RND: press the LFO page key again (and again to return). DS1/DS2 (knobs A, B) are destinations picked from stock's LFO DST list restricted to sixteen (the eight machine parameters, FIN, STA, FRQ, RES, DEC, PAN, DEL, REV); DP1/DP2 (E, F) are depths, 0..64 in sixteen steps. On every note trig each modifier offsets its destination by a random -N..+N, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound. Voice tracks only; not p-lockable.
+A second LFO page, LFO RND: press the LFO page key again (and again to return). DS1/DS2 (knobs A, B) are destinations picked from stock's LFO DST list restricted to sixteen (the eight machine parameters, FIN, STA, FRQ, RES, DEC, PAN, DEL, REV); DP1/DP2 (E, F) are depths, 0..64 in sixteen steps. On every note trig each modifier offsets its destination by a random -N..+N, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound, in core-ar2 0.2's mod storage (below). Voice tracks only; not p-lockable.
+
+Needs core-ar2 0.2 or later (`"resources": {"core": "0.2"}`).
+
+## Storage (1.1)
+
+The four settings are one 16-bit field in core-ar2's mod storage,
+`{"sym": "lfo_rnd_cfg", "scope": "sound", "bits": 16}`, packed as before: DS1 in bits 0-3
+(a position in the sixteen destinations), DP1 in 4-7 (an index into the sixteen depths), DS2
+in 8-11, DP2 in 12-15. All zero is both destinations on the machine's first parameter and both depths 0 (off),
+core's default. The item is the track's live sound as `shared_cur_sound`/`shared_sound_of`
+return it (the active kit's track accessor, vtable +0x28); in rytm-emu that is the same
+object as store-check's `LIVE_KIT_SOUND(-1, track)` (live project 0x407c89cb + 0xa8cf18 +
+42 + 152 * track); core keeps the field in the sound's spare bytes +0x6d..+0x6f (with
+the lockfile of a build of core and lfo-rnd alone, +0x6d..+0x6e). One field rather than four:
+the trig path makes one `core_store_get` per voice trig.
+
+Not with voice-dac 1.1 in one build: it writes +0x6d..+0x6f itself, untagged, so the two
+would overwrite each other's values. 16 bits of core's 24 a sound are this field's; voice-dac
+needs 18 of them today.
+
+- `nibble` (the page's dial, popup, picker reads) and `trig_cfg_gate` (sequencer interrupt,
+  per voice trig) read the word with `core_store_get`. `audio_gate` still reads only the
+  per-track copy `trig_cfg_gate` makes, so the audio interrupt makes no core call.
+- `set_field` reads, modifies and writes it with `core_store_set`; only the UI writes it.
+- After each change the stub sends the notice stock's own sound settings setters send,
+  `{SoundConfigChangedInfo (0x401cb5dc on 1.73), 1}` through the selected track's sound
+  accessor (vtable +16), as voice-dac and stock's ENV RESET setter do. Without it the live
+  sound is changed but the stored sound is not, and the change is lost at a reboot without a
+  kit save (checked: see Results).
+
+The sound's parameter word 0 is no longer where the settings live, so its stock bytes stay
+stock (0). The ROM record patches making ids 1..4's container index 0 stay: the destination
+list, `list_filter_gate`, `list_same_gate` and `knob_cidx_gate` key on it.
+
+**Sounds saved by 1.0 keep their settings.** lfo-rnd 1.0 (and rytm-mods) kept the word in
+parameter word 0 (live sound +0x14, stored slot 41), which stock loads and saves. 1.1 reads
+that word whenever the field is 0 (`word_of`), so such a sound plays and shows its settings
+as before. The first edit on the LFO RND page moves the whole word into the field and clears
+word 0 in the live sound and, through the kit's parameter bank (`shared_mark_changed` with 0,
+the 1.0 path), in the stored one. A sound no one edits keeps its old word, which 1.0 reads
+too. The cost is a test and a branch per read.
 
 ## Sites
 
@@ -66,6 +107,10 @@ table is a `ptr` site.
 - Every section the stub had in separate caves is `.text` here, one `.run` the linker places in
   the DDR mods area.
 - 0000-shared's runtime is assembled into the mod, at the end of the unit (`../shared/shared.s`): its references into it, absolute in rytm-mods, are PC-relative here, so the code is a few bytes shorter.
+- 1.1: the settings moved from the sound's parameter word 0 to core-ar2 0.2's mod storage
+  (Storage, above), so a sound's stock bytes are what stock would have; the kit parameter
+  bank write (`kit_param_changed`) became the sound change notice, and is kept only to clear
+  a 1.0 word once it has been moved.
 - rytm-mods put two small gates (`knob_cidx_gate`, `list_new_gate`) in their own section at the end of cave4 for lack of room; here they stay in `.run`, in source order.
 
 ## Test (on a unit)
@@ -74,8 +119,36 @@ table is a `ptr` site.
 2. Turn DS1: the destination list opens; pick FRQ, YES. DP1 to 32.
 3. Play trigs on that track: the cutoff varies note to note. DP1 = 0: no change.
 4. Save the kit, power-cycle, reload: the four settings are kept.
+5. Power-cycle without saving the kit: the four settings are kept.
+6. A kit saved with lfo-rnd 1.0: its settings show and play; change one, power-cycle, the
+   change is kept and the rest are as they were.
 
 ## Results so far
+
+### 1.1 (core-ar2 0.2 storage)
+
+- Built with elekloader 92a99c9 (core-ar2 0.2): `.run` 1792 B, 38 sites (the same as 1.0's,
+  same addresses and resumes), 6 relocations, imports `core_store_get`, `core_store_set`,
+  `lfo_rnd_cfg`; lint OK with core 0.2 on 1.73 and 1.74; linked with core 0.2 alone. The
+  lockfile placed `lfo_rnd_cfg` at sound bit 0 (descriptor 0x14000000).
+- rytm-emu, core 0.2 + lfo-rnd 1.1, 1.73 and 1.74 (every frame identical between the two
+  OS): LFO twice opens LFO RND; DS1 opens the list, YES confirms DEC; DP1 steps to 8; on SD,
+  DS2 to FIN and DP2 to 2; TRK + BD and TRK + SD show each track's own values. The 27 frames
+  of that run are pixel-identical to lfo-rnd 1.0's (with core 0.1) on the same OS. Memory
+  after it: BD's live sound +0x6d..+0x6f = 00 62 00, SD's 28 00 00, every other track's 0;
+  word 0 (+0x14) is 0 on every track, as in stock.
+- Power off (the firmware's power-fail save) without a kit save, cold boot: the same bytes
+  and values. A build with the notice taken out lost both sounds' values this way.
+- Playing (MIDI start): SD's trig copies 0x2800 into the trig cache and draws its R2 offset
+  on FIN (-2), on both OS.
+- Migration: a card saved by lfo-rnd 1.0 (core 0.1) with BD 0x0062 and SD 0x2800 in word 0,
+  cold-booted with 1.1: the page shows them, SD's trigs use 0x2800. DP1 on BD changed: BD's
+  field 0x0082, its word 0 cleared; after power off and cold boot both stay so, SD keeps its
+  1.0 word. 1.73 and 1.74 alike.
+- Not checked: hardware; kit save and reload through the menu, the sound pool, copy/paste,
+  SysEx (core documents them as carrying sound fields); the random offsets as heard.
+
+### 1.0
 
 - Built with elekloader at d17478b and m68k-linux-gnu binutils 2.42: `.run` 1596 B,
   38 sites, 2 relocations; lint OK; links with core-ar2 0.1 and the other ports.

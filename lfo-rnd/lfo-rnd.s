@@ -6,8 +6,9 @@
         | Mod 0004 - LFO RND. Phase 1: page, editing, dial, popup, storage.
         | Phase 2: the modifiers are applied.
         |
-        | The four settings live in the sound's parameter word at sound index 0
-        | (live sound +0x14, storage slot 41), which no stock parameter uses:
+        | The four settings are one 16-bit field in core-ar2 0.2's mod storage,
+        | lfo_rnd_cfg, sound scope (the live sound's spare bytes, saved in the
+        | stored sound's spare slots with core's layout ID):
         |
         |   bits 0..3   R1 DST   index into dst_indices
         |   bits 4..7   R1 DEP   index into shared_amounts
@@ -16,6 +17,12 @@
         |
         | Parameter ids 1..4 are dead Error records, renamed by registry patches.
         | Field = id - 1, so the nibble shift is field * 4 and odd fields are depths.
+        |
+        | lfo-rnd 1.0 and rytm-mods kept the same word in the sound's parameter
+        | word at sound index 0 (live sound +0x14, storage slot 41), which no stock
+        | parameter uses. 1.1 reads that word while the field is 0, so sounds saved
+        | by the older builds keep their settings, and moves it into the field at
+        | the first edit, clearing word 0 (word_of, set_field).
 
         .include "../include/ar2-1.73.inc"
 
@@ -31,6 +38,12 @@
         .equ    PARAM_ROM,      0x401bf918        | 0x34-byte ROM parameter records
         .equ    PARAM_ROM_SHORT, 0x30
         .equ    LIST_X,         184               | the list view's x; +188 is its width
+        .equ    LR_TRACKSEL,    48                | project: the selected track
+        .equ    LR_KIT,         352               | project: the active kit
+        .equ    VT_CONFIG_CHANGED, 16             | the sound accessor's change notice
+        .equ    SOUND_CONFIG_CHANGED, 0x401cb5dc  | SoundConfigChangedInfo's vtable
+
+        .extern core_store_get, core_store_set, lfo_rnd_cfg
 
         .text
 
@@ -101,6 +114,65 @@ title_after_cycle:
         | inlined below as: subq #1; moveq #3,d1; cmp.l d1,d0; bhi not-ours
 
         | ------------------------------------------------------------------
+        | word_of(a0 = a live sound) -> d0 = its packed word
+        |
+        | core's field, lfo_rnd_cfg; while that is 0, the word lfo-rnd 1.0 kept in
+        | the sound's parameter word 0, so a sound saved by it keeps its settings
+        | until the first edit moves them into the field. A stock sound has 0 there
+        | too. Keeps a0; clobbers d0/d1/a1. Safe in any context (the sequencer
+        | interrupt calls it): core_store_get masks interrupts for its loop.
+        | ------------------------------------------------------------------
+        .align  2
+word_of:
+        move.l  %a0,-(%sp)
+        clr.l   -(%sp)                            | index, unused for a sound
+        move.l  %a0,-(%sp)                        | item: the live sound
+        move.l  #lfo_rnd_cfg,-(%sp)               | the field's descriptor, absolute
+        jsr     core_store_get
+        lea     12(%sp),%sp
+        move.l  (%sp)+,%a0
+        tst.l   %d0
+        bne.s   1f
+        mvzw    OFF_PARAMS(%a0),%d0               | lfo-rnd 1.0's word, or stock's 0
+1:      rts
+
+        | ------------------------------------------------------------------
+        | notify() - the change notice stock's sound settings setters send
+        |
+        | {SoundConfigChangedInfo, 1} through the selected track's sound
+        | accessor, vtable +16, as stock's ENV RESET setter (0x400bcee4) and
+        | voice-dac do: without it a write to the live sound's bytes outside the
+        | 42 parameters is lost at a reboot unless the kit is saved. Clobbers
+        | d0/d1/a0/a1.
+        | ------------------------------------------------------------------
+        .align  2
+notify:
+        jsr     project_singleton
+        move.l  %d0,%a0
+        pea     LR_TRACKSEL(%a0)
+        jsr     track_index_of
+        addq.l  #4,%sp
+        move.l  %d0,-(%sp)                        | the track
+        jsr     project_singleton
+        move.l  %d0,%a0
+        pea     LR_KIT(%a0)                       | the active kit
+        jsr     kit_track_sound
+        addq.l  #8,%sp
+        tst.l   %d0
+        beq.s   9f
+        lea     -8(%sp),%sp                       | SoundConfigChangedInfo, kind 1
+        move.l  #SOUND_CONFIG_CHANGED,(%sp)
+        move.b  #1,4(%sp)
+        move.l  %sp,-(%sp)
+        move.l  %d0,-(%sp)                        | the accessor
+        move.l  %d0,%a0
+        move.l  (%a0),%a0
+        move.l  VT_CONFIG_CHANGED(%a0),%a0
+        jsr     (%a0)
+        lea     16(%sp),%sp
+9:      rts
+
+        | ------------------------------------------------------------------
         | nibble(d1 = field) -> d0 = that setting's 0..15, from the current sound
         | Clobbers d0/d1/a0/a1. Returns 0 when there is no sound.
         | ------------------------------------------------------------------
@@ -111,7 +183,9 @@ nibble:
         move.l  (%sp)+,%d1                        | sets the flags from d1, so
         tst.l   %d0                               | test the sound again
         beq.s   1f
-        mvzw    OFF_PARAMS(%a0),%d0
+        move.l  %d1,-(%sp)
+        bsr.w   word_of
+        move.l  (%sp)+,%d1
         lsl.l   #2,%d1
         lsr.l   %d1,%d0
         moveq   #15,%d1
@@ -214,12 +288,16 @@ delta_gate:
         bsr.w   set_field
         tst.l   %d1
         beq.s   7f
-        move.l  %d0,-(%sp)                        | the new word
-        move.l  %sp@(24),-(%sp)                   | the id
+        subq.l  #1,%d1
+        beq.s   3f
+        clr.l   -(%sp)                            | lfo-rnd 1.0's word moved out:
+        move.l  %sp@(24),-(%sp)                   | clear it in the kit's bank too
         jsr     shared_mark_changed
-        move.l  %a2,(%sp)                         | the view
-        jsr     VIEW_INVALIDATE                   | redraw now, not on the next refresh
         addq.l  #8,%sp
+3:      jsr     notify                            | elemod 1.1: was shared_mark_changed
+        move.l  %a2,-(%sp)                        | the view
+        jsr     VIEW_INVALIDATE                   | redraw now, not on the next refresh
+        addq.l  #4,%sp
 7:      movem.l (%sp),%d2-%d3/%a2                 | param_apply_delta's epilogue
         lea     12(%sp),%sp
         rts
@@ -343,8 +421,13 @@ knob_draw_gate:
 
         | ------------------------------------------------------------------
         | set_field(d0 = new setting 0..15, d1 = field)
-        |   -> d0 = the new packed word, d1 = 0 when there is no sound
-        | Clobbers d0/d1/a0/a1.
+        |   -> d0 = the new packed word, d1 = 0 when there is no sound, 1 when
+        |      written, 2 when written and lfo-rnd 1.0's word 0 was cleared (the
+        |      caller then clears it in the kit's parameter bank as well)
+        |
+        | Reads the word (word_of), puts the setting in, and writes the whole word
+        | to core's field. Only the UI writes the field, so the read-modify-write
+        | needs no lock. Clobbers d0/d1/a0/a1.
         | ------------------------------------------------------------------
         .align  2
 set_field:
@@ -352,20 +435,35 @@ set_field:
         move.l  %d0,-(%sp)                        | the new setting
         jsr     shared_cur_sound
         beq.s   9f
-        move.l  (%sp)+,%d0
-        move.l  (%sp)+,%d1
+        move.l  %d2,-(%sp)
+        move.l  %a0,-(%sp)                        | 0 sound, 4 d2, 8 setting, 12 field
+        bsr.w   word_of                           | d0 = the old word
+        move.l  12(%sp),%d1
         lsl.l   #2,%d1                            | shift
+        moveq   #15,%d2
+        lsl.l   %d1,%d2
+        not.l   %d2                               | its mask
+        and.l   %d0,%d2
+        move.l  8(%sp),%d0
         lsl.l   %d1,%d0
-        move.l  %d0,-(%sp)                        | the new field, in place
-        moveq   #15,%d0
-        lsl.l   %d1,%d0
-        not.l   %d0                               | its mask
-        mvzw    OFF_PARAMS(%a0),%d1
-        and.l   %d0,%d1
-        or.l    (%sp)+,%d1
-        move.w  %d1,OFF_PARAMS(%a0)
-        move.l  %d1,%d0                           | the new packed word
+        or.l    %d0,%d2                           | the new packed word
         moveq   #1,%d1
+        move.l  (%sp),%a0
+        tst.w   OFF_PARAMS(%a0)
+        beq.s   1f
+        clr.w   OFF_PARAMS(%a0)                   | lfo-rnd 1.0's word: now the field's
+        moveq   #2,%d1
+1:      move.l  %d1,8(%sp)                        | the answer, over the setting
+        move.l  %d2,-(%sp)                        | value
+        clr.l   -(%sp)                            | index
+        move.l  %a0,-(%sp)                        | item: the live sound
+        move.l  #lfo_rnd_cfg,-(%sp)               | the field's descriptor, absolute
+        jsr     core_store_set
+        lea     16(%sp),%sp
+        move.l  %d2,%d0                           | the new packed word
+        move.l  8(%sp),%d1
+        move.l  4(%sp),%d2
+        lea     16(%sp),%sp
         rts
 9:      addq.l  #8,%sp
         clr.l   %d1
@@ -447,11 +545,14 @@ setter_gate:
         bsr.w   set_field
         tst.l   %d1
         beq.s   8f
-        move.l  %d0,-(%sp)                        | the new word
-        move.l  16(%sp),-(%sp)                    | the id
+        subq.l  #1,%d1
+        beq.s   7f
+        clr.l   -(%sp)                            | lfo-rnd 1.0's word moved out:
+        move.l  16(%sp),-(%sp)                    | clear it in the kit's bank too
         move.l  16(%sp),%a1                       | the parameter set
         jsr     shared_mark_changed_set
         addq.l  #8,%sp
+7:      jsr     notify                            | elemod 1.1: was shared_mark_changed_set
 8:      addq.l  #4,%sp
         rts
 9:      lea     %sp@(-40),%sp                     | displaced
@@ -641,7 +742,9 @@ trig_cfg_gate:
         tst.l   %d0
         beq.s   9f
         move.l  %d0,%a0
-        mvzw    OFF_PARAMS(%a0),%d0
+        move.l  %d1,-(%sp)
+        bsr.w   word_of                           | elemod 1.1: was mvzw OFF_PARAMS(%a0),%d0
+        move.l  (%sp)+,%d1
         lea     cfg,%a1
         add.l   %d1,%d1
         move.w  %d0,%a1@(0,%d1:l)
