@@ -127,6 +127,11 @@ table is a `ptr` site.
 
 ### 1.1 (core-ar2 0.2 storage)
 
+- Hardware, Analog Rytm MKII OS 1.74, 2026-10-20, with core-ar2 0.3 and all eleven mods: test steps
+  1 to 6 pass, with LFO RND kept through kit save and reload, a power-cycle without a kit save, the
+  +Drive sound library, and a kit sent and received by SysEx and by Overbridge. Not run on hardware
+  with core 0.2, or on OS 1.73.
+
 - Built with elekloader 92a99c9 (core-ar2 0.2): `.run` 1792 B, 38 sites (the same as 1.0's,
   same addresses and resumes), 6 relocations, imports `core_store_get`, `core_store_set`,
   `lfo_rnd_cfg`; lint OK with core 0.2 on 1.73 and 1.74; linked with core 0.2 alone. The
