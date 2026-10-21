@@ -10,7 +10,6 @@ mod storage and build for OS 1.74 only; lfo-rnd uses core-ar2's storage too. Fro
 1.2, voice-dac 1.3, euclid-accents 1.2 and velocity-humanise 1.2 reach the parameter pages through
 core-ar2 0.4's page tables, so they need core-ar2 0.4 (OS 1.74 only), and other mods with pages
 can link beside them. comp-preview 1.1 lists its preview through core 0.4's page-key lists for the
-same reason, so a mod can add a page behind COMP too. comp-preview 1.1 lists its preview through core 0.4's page-key lists for the
 same reason, so a mod can add a page behind COMP too.
 
 No firmware is included: no OS files, sections, dumps or built `.syx`/`.elemod` files. The
@@ -137,13 +136,13 @@ keep it, and the `out/` build folders, out of git and out of any upload.
 | 0012-slice-loop | `slice-loop/` | hardware-verified | matches label by label; **confirmed on a unit** |
 | 0014-ctrl-all | `ctrl-all/` | hardware-verified | 1.2, MrScruff's SYNTH knob fix (9831bdf): matches label by label, **confirmed on a unit** on OS 1.74; 1.0 and 1.1 **confirmed on a unit** |
 | 0015-env-reset-amp | `env-reset-amp/` | hardware-verified | bit probe left out; matches label by label; **confirmed on a unit** |
-| 0002-euclid-accents | `euclid-accents/` | hardware-verified | 1.1, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 matches label by label, **confirmed on a unit** |
-| 0003-velocity-humanise | `velocity-humanise/` | built (MANUAL: verified) | 1.1, settings in core-ar2 0.3's storage, stands alone: **confirmed on a unit** on OS 1.74; 1.0 matches label by label, **confirmed on a unit** |
-| 0004-lfo-rnd | `lfo-rnd/` | built (MANUAL: verified) | 1.1, settings in core-ar2's storage: **confirmed on a unit** on OS 1.74 with core 0.3; 1.0 matches label by label, **confirmed on a unit** |
-| 0006-comp-preview | `comp-preview/` | hardware-verified | matches label by label; **confirmed on a unit** |
+| 0002-euclid-accents | `euclid-accents/` | hardware-verified | 1.2 on core-ar2 0.4's pages and 1.1, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 matches label by label, **confirmed on a unit** |
+| 0003-velocity-humanise | `velocity-humanise/` | built (MANUAL: verified) | 1.2 on core-ar2 0.4's pages: **confirmed on a unit** on OS 1.74; 1.1, settings in core-ar2 0.3's storage, stands alone: **confirmed on a unit** on OS 1.74; 1.0 matches label by label, **confirmed on a unit** |
+| 0004-lfo-rnd | `lfo-rnd/` | built (MANUAL: verified) | 1.2 on core-ar2 0.4's pages: **confirmed on a unit** on OS 1.74; 1.1, settings in core-ar2's storage: **confirmed on a unit** on OS 1.74 with core 0.3; 1.0 matches label by label, **confirmed on a unit** |
+| 0006-comp-preview | `comp-preview/` | hardware-verified | 1.1, its preview in core-ar2 0.4's COMP list: **confirmed on a unit** on OS 1.74, also beside duck; 1.0 matches label by label, **confirmed on a unit** |
 | 0009-main-rms | `main-rms/` | built (MANUAL: display checked on the device) | matches label by label; **confirmed on a unit** |
 | 0010-kit-ab | `kit-ab/` | hardware-verified | matches label by label; **confirmed on a unit** |
-| 0013-voice-dac | `voice-dac/` | hardware-verified | default build only (no timing, prof, burn or dbg); 1.1, MrScruff's update (76ae299): matches label by label but for three names where sections meet; 1.2, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 **confirmed on a unit** |
+| 0013-voice-dac | `voice-dac/` | hardware-verified | default build only (no timing, prof, burn or dbg); 1.1, MrScruff's update (76ae299): matches label by label but for three names where sections meet; 1.3 on core-ar2 0.4's pages and 1.2, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 **confirmed on a unit** |
 
 Every mod on rytm-mods-src main is now ported. "Matches label by label": `tools/verify_port.py`
 re-assembles rytm-mods' own code, checks it equals rytm-mods-src's default build ("T2"), then

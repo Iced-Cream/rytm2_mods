@@ -93,7 +93,8 @@ the other bits (0x400c0e32), and hooks in `pattern_track_save`/`pattern_track_lo
 ### 1.2 on core-ar2 0.4
 
 - rytm-emu, OS 1.74, core-ar2 0.4 with all eleven mods against the v1.2 release build (core 0.3):
-  Bool Operator's turn and text, every screen of the same key and knob sequence pixel-identical. Not on a unit yet.
+  Bool Operator's turn and text, every screen of the same key and knob sequence pixel-identical.
+- Hardware, Analog Rytm MKII OS 1.74, 2026-10-21, core-ar2 0.4 with all eleven mods (P4A4, then Q4A4 with the page-key lists): every test step passes.
 
 ### 1.1 on core-ar2 0.3
 

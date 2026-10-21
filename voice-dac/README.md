@@ -145,7 +145,8 @@ with core 0.4 (their sites overlap core's), and 1.3 does not link with core 0.3.
 ### 1.3 on core-ar2 0.4
 
 - rytm-emu, OS 1.74, core-ar2 0.4 with all eleven mods against the v1.2 release build (core 0.3):
-  DAC FILTER's page and its knobs, every screen of the same key and knob sequence pixel-identical. Not on a unit yet.
+  DAC FILTER's page and its knobs, every screen of the same key and knob sequence pixel-identical.
+- Hardware, Analog Rytm MKII OS 1.74, 2026-10-21, core-ar2 0.4 with all eleven mods (P4A4, then Q4A4 with the page-key lists): every test step passes.
 
 1.2 builds for OS 1.74 only: it needs core-ar2 0.3, which has no 1.73 port. Its 1.73 source stays
 the porting master, as for every mod here (`tools/port_os.py`).
