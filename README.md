@@ -6,7 +6,11 @@ link with [elekloader](https://github.com/irpina/elekloader)'s `core-ar2` and wi
 instead of being patched into code caves at fixed addresses.
 
 From v1.2, euclid-accents, velocity-humanise and voice-dac keep their settings in core-ar2 0.3's
-mod storage and build for OS 1.74 only; lfo-rnd uses core-ar2's storage too.
+mod storage and build for OS 1.74 only; lfo-rnd uses core-ar2's storage too. From v1.3, lfo-rnd
+1.2, voice-dac 1.3, euclid-accents 1.2 and velocity-humanise 1.2 reach the parameter pages through
+core-ar2 0.4's page tables, so they need core-ar2 0.4 (OS 1.74 only), and other mods with pages
+can link beside them. comp-preview 1.1 lists its preview through core 0.4's page-key lists for the
+same reason, so a mod can add a page behind COMP too.
 
 No firmware is included: no OS files, sections, dumps or built `.syx`/`.elemod` files. The
 mods name firmware routines by address only (`include/ar2-1.73.inc`, `include/ar2-1.74.inc`), and their `mod.json`
@@ -54,11 +58,14 @@ velocity-humanise, lfo-rnd and voice-dac keep their settings in core-ar2's mod s
 velocity-humanise 1.1 and voice-dac 1.2 need core-ar2 0.3, which is OS 1.74 only, and lfo-rnd
 1.1 needs 0.2 or later. velocity-humanise no longer needs euclid-accents.
 
-The gate chain: euclid-accents, velocity-humanise, lfo-rnd, voice-dac and ctrl-all detour
-consecutive instructions of param_apply_delta (0x400378a6..0x400378c2) and euclid-accents,
-velocity-humanise, lfo-rnd and voice-dac those of param_value_text (0x400a85e0..0x400a85f8).
-Each is its own site, and each stub rejoins at the next instruction, which is the next mod's
-jmp when that mod is linked and stock when it is not - as in rytm-mods.
+The page routines: from core-ar2 0.4, core owns the entries of page_info, page_get_value,
+param_apply_delta and param_value_text and asks each mod's `core_pages` and `core_params` entries
+in turn (lfo-rnd, voice-dac, euclid-accents, velocity-humanise, by their `order`), before stock;
+the four answer for different ids, so the order does not change what they do.
+Mods that hook deeper in those routines keep their own sites: ctrl-all in param_apply_delta
+(0x400378c2 on 1.74) and filter-hz in param_value_text. Before core 0.4 the four mods detoured
+consecutive instructions at each entry, each rejoining at the next mod's jmp, as in rytm-mods,
+which left no room for a fifth mod with pages.
 
 ## OS 1.74
 
@@ -129,13 +136,13 @@ keep it, and the `out/` build folders, out of git and out of any upload.
 | 0012-slice-loop | `slice-loop/` | hardware-verified | matches label by label; **confirmed on a unit** |
 | 0014-ctrl-all | `ctrl-all/` | hardware-verified | 1.2, MrScruff's SYNTH knob fix (9831bdf): matches label by label, **confirmed on a unit** on OS 1.74; 1.0 and 1.1 **confirmed on a unit** |
 | 0015-env-reset-amp | `env-reset-amp/` | hardware-verified | bit probe left out; matches label by label; **confirmed on a unit** |
-| 0002-euclid-accents | `euclid-accents/` | hardware-verified | 1.1, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 matches label by label, **confirmed on a unit** |
-| 0003-velocity-humanise | `velocity-humanise/` | built (MANUAL: verified) | 1.1, settings in core-ar2 0.3's storage, stands alone: **confirmed on a unit** on OS 1.74; 1.0 matches label by label, **confirmed on a unit** |
-| 0004-lfo-rnd | `lfo-rnd/` | built (MANUAL: verified) | 1.1, settings in core-ar2's storage: **confirmed on a unit** on OS 1.74 with core 0.3; 1.0 matches label by label, **confirmed on a unit** |
-| 0006-comp-preview | `comp-preview/` | hardware-verified | matches label by label; **confirmed on a unit** |
+| 0002-euclid-accents | `euclid-accents/` | hardware-verified | 1.2 on core-ar2 0.4's pages and 1.1, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 matches label by label, **confirmed on a unit** |
+| 0003-velocity-humanise | `velocity-humanise/` | built (MANUAL: verified) | 1.2 on core-ar2 0.4's pages: **confirmed on a unit** on OS 1.74; 1.1, settings in core-ar2 0.3's storage, stands alone: **confirmed on a unit** on OS 1.74; 1.0 matches label by label, **confirmed on a unit** |
+| 0004-lfo-rnd | `lfo-rnd/` | built (MANUAL: verified) | 1.2 on core-ar2 0.4's pages: **confirmed on a unit** on OS 1.74; 1.1, settings in core-ar2's storage: **confirmed on a unit** on OS 1.74 with core 0.3; 1.0 matches label by label, **confirmed on a unit** |
+| 0006-comp-preview | `comp-preview/` | hardware-verified | 1.1, its preview in core-ar2 0.4's COMP list: **confirmed on a unit** on OS 1.74, also beside duck; 1.0 matches label by label, **confirmed on a unit** |
 | 0009-main-rms | `main-rms/` | built (MANUAL: display checked on the device) | matches label by label; **confirmed on a unit** |
 | 0010-kit-ab | `kit-ab/` | hardware-verified | matches label by label; **confirmed on a unit** |
-| 0013-voice-dac | `voice-dac/` | hardware-verified | default build only (no timing, prof, burn or dbg); 1.1, MrScruff's update (76ae299): matches label by label but for three names where sections meet; 1.2, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 **confirmed on a unit** |
+| 0013-voice-dac | `voice-dac/` | hardware-verified | default build only (no timing, prof, burn or dbg); 1.1, MrScruff's update (76ae299): matches label by label but for three names where sections meet; 1.3 on core-ar2 0.4's pages and 1.2, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 **confirmed on a unit** |
 
 Every mod on rytm-mods-src main is now ported. "Matches label by label": `tools/verify_port.py`
 re-assembles rytm-mods' own code, checks it equals rytm-mods-src's default build ("T2"), then

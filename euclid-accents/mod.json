@@ -1,23 +1,17 @@
 {
  "id": "euclid-accents",
- "version": "1.1",
+ "version": "1.2",
  "title": "Euclidean accents",
  "category": "Sequencer",
  "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
  "license": "GPL-2.0-only",
- "description": "Per track, the euclidean generator colours the pattern's own trigs with ACCENT instead of deciding which steps fire: the grid says when, euclid says what is accented. Bool Operator's range grows from OR, XOR, AND, SUB to eight values, each operator with an accent variant, so the setting is per track and saved with the pattern, in core-ar2's mod storage. Live behaviour, the FUNC-held bake and the plain revert are kept. Port of rytm-mods 0002-euclid-accents.",
+ "description": "Per track, the euclidean generator colours the pattern's own trigs with ACCENT instead of deciding which steps fire: the grid says when, euclid says what is accented. Bool Operator's range grows from OR, XOR, AND, SUB to eight values, each operator with an accent variant, so the setting is per track and saved with the pattern, in core-ar2's mod storage. Live behaviour, the FUNC-held bake and the plain revert are kept. Port of rytm-mods 0002-euclid-accents. From 1.2 Bool Operator's turn and text go through core-ar2 0.4's page tables (needs core 0.4, OS 1.74 only).",
  "device": "analog-rytm-mk2",
  "os": "1.73",
  "sources": [
   "euclid-accents.s"
  ],
  "sites": [
-  {
-   "addr": "0x400378a6",
-   "stock": "4feffff448d7040c",
-   "op": "jmp",
-   "target": "euclid_accents_param_delta_gate"
-  },
   {
    "addr": "0x4009aaca",
    "stock": "102802ca43f37a00",
@@ -29,12 +23,6 @@
    "stock": "75f208006014",
    "op": "jmp",
    "target": "euclid_accents_trig_fire_accent"
-  },
-  {
-   "addr": "0x400a85e0",
-   "stock": "4fefffec48d70c1c",
-   "op": "jmp",
-   "target": "euclid_accents_boolop_text_gate"
   },
   {
    "addr": "0x400c3c0e",
@@ -106,7 +94,7 @@
   "core"
  ],
  "resources": {
-  "core": "0.3"
+  "core": "0.4"
  },
  "ports": {
   "1.74": {
@@ -114,12 +102,6 @@
     "os1.74/euclid-accents.s"
    ],
    "sites": [
-    {
-     "addr": "0x400378a6",
-     "stock": "4feffff448d7040c",
-     "op": "jmp",
-     "target": "euclid_accents_param_delta_gate"
-    },
     {
      "addr": "0x4009ab36",
      "stock": "102802ca43f37a00",
@@ -131,12 +113,6 @@
      "stock": "75f208006014",
      "op": "jmp",
      "target": "euclid_accents_trig_fire_accent"
-    },
-    {
-     "addr": "0x400a864c",
-     "stock": "4fefffec48d70c1c",
-     "op": "jmp",
-     "target": "euclid_accents_boolop_text_gate"
     },
     {
      "addr": "0x400c3c7a",
@@ -198,5 +174,20 @@
     }
    ]
   }
- }
+ },
+ "contribute": [
+  {
+   "to": "core_params",
+   "order": 30,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:euclid_accents_params",
+     0
+    ]
+   ]
+  }
+ ]
 }

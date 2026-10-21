@@ -47,66 +47,13 @@
 
         .text
 
-        | ------------------------------------------------------------------
-        | page_info, answering page 12.
-        |
-        | Entered by a jmp at the entry, so (%sp) is the return address and
-        | 4(%sp) the page id. Returns the descriptor in d0, as stock does.
-        | ------------------------------------------------------------------
-        .align  2
-        .globl  lfo_rnd_page_info_gate
-lfo_rnd_page_info_gate:
-page_info_gate:
-        moveq   #PAGE_RND,%d0
-        cmp.l   4(%sp),%d0
-        bne.s   1f
-        lea     page_rnd,%a0
-        move.l  %a0,%d0
-        rts
-1:      moveq   #11,%d1                           | displaced
-        move.l  %sp@(4),%d0                       | displaced
-        jmp     page_info_resume
+        | Page 12 is in core-ar2 0.4's core_pages (lfo_rnd_page, below), and
+        | ids 1..4 in its core_params (lfo_rnd_params): core asks get, delta and
+        | text below for them from page_info, page_get_value, param_apply_delta
+        | and param_value_text's entries. (1.1 detoured those four itself.)
 
-        | ------------------------------------------------------------------
-        | The page key's cycle, then the header title.
-        |
-        | page_view_activate pushes the title once, before the key handler cycles
-        | to the next page, so the header lagged one page. Reached by a jmp over
-        | `movel %a2,%sp@-; jsr 0x40078514` right after the cycle; a2 is the view.
-        | Re-emits both - the pushed view stays for stock's addql #8 - then pushes
-        | the new page's title exactly as page_view_activate does.
-        | ------------------------------------------------------------------
-        .equ    VT_TITLE,       0x4c
-        .equ    VIEW_UI,        108
-
-        .align  2
-        .globl  lfo_rnd_title_after_cycle
-lfo_rnd_title_after_cycle:
-title_after_cycle:
-        move.l  %a2,-(%sp)                        | displaced
-        jsr     0x40078514                        | displaced
-        lea     -24(%sp),%sp
-        movem.l %d0-%d1/%a0-%a1,(%sp)             | string at 20(sp), alloc byte at 19(sp)
-        move.l  %a2,-(%sp)
-        move.l  (%a2),%a0
-        move.l  VT_TITLE(%a0),%a0
-        jsr     (%a0)                             | d0 = title
-        addq.l  #4,%sp
-        pea     19(%sp)                           | allocator
-        move.l  %d0,-(%sp)                        | c string
-        pea     28(%sp)                           | &string
-        jsr     std_string_from_cstr
-        lea     12(%sp),%sp
-        pea     20(%sp)                           | &string
-        move.l  VIEW_UI(%a2),-(%sp)
-        jsr     ui_set_title
-        addq.l  #8,%sp
-        pea     20(%sp)
-        jsr     std_string_dtor
-        addq.l  #4,%sp
-        movem.l (%sp),%d0-%d1/%a0-%a1
-        lea     24(%sp),%sp
-        jmp     page_cycle_after_invalidate
+        | The header's title after the page key's step is core-ar2 0.4's (1.1 and
+        | 1.2's first builds pushed it here, for every view).
 
         | ------------------------------------------------------------------
         | field_of(d0 = parameter id) -> d0 = field 0..3, or C set if not ours
@@ -214,65 +161,51 @@ setting_of:
 1:      rts
 
         | ------------------------------------------------------------------
-        | page_get_value, answering ids 1..4 for the dials.
+        | get(id, *value), core_params: ids 1..4 for the dials.
         |
-        | Entered by a jmp at the entry: (%sp) return, 4 view, 8 id, 12 lock.
         | Values are 8.8 on the 0..127 scale. A destination shows as its list
         | position times eight, which spaces its sixteen positions evenly across
         | the dial. A depth shows as its stop: the sixteen depths spread evenly
         | over the knob's travel, so each turn of the knob moves the needle the
         | same distance and the knob reads as a sixteen position selector. The
         | popup reads the setting from the sound instead, so it shows N or the
-        | destination's name (text_gate).
+        | destination's name (text).
         | ------------------------------------------------------------------
         .align  2
-        .globl  lfo_rnd_get_gate
-lfo_rnd_get_gate:
-get_gate:
-        move.l  8(%sp),%d0
+lfo_rnd_get:
+        move.l  4(%sp),%d0
         subq.l  #ID_FIRST,%d0
-        moveq   #3,%d1
-        cmp.l   %d1,%d0
-        bhi.s   9f
         bsr.s   setting_of
         btst    #0,%d1
         beq.s   2f
         lea     shared_stops,%a0
         mvzb    %a0@(0,%d0:l),%d0                 | depth: the setting's stop
 2:      lsl.l   #8,%d0
+        move.l  8(%sp),%a0
+        move.l  %d0,(%a0)
+        moveq   #1,%d0
         rts
-9:      lea     %sp@(-12),%sp                     | displaced
-        moveml  %d2-%d3/%a2,%sp@                  | displaced
-        jmp     page_get_value_body
 
         | ------------------------------------------------------------------
-        | param_apply_delta for ids 1..4.
+        | delta(view, id, delta, func), core_params: a turn on ids 1..4.
         |
-        | Reached by a jmp over `mvzb %d3,%d3; movel %a2@(116),%sp@-`, after the
-        | prologue: %sp@(0..11) holds d2/d3/a2, %sp@(20) is the id, %sp@(24) the
-        | delta in 8.8. Handling the id here and returning also means stock never
-        | creates a p-lock for these parameters.
+        | The delta is 8.8; whole steps change the setting. Taking the turn
+        | means stock never creates a p-lock for these parameters, and core
+        | redraws the view, which the write here does not.
         |
         | A destination writes on every turn, as LFO DST does: the destination
         | list does not scroll itself, the picker moves its highlight to the
         | value it reads back after the write. YES commits that entry through
         | setter_gate; NO writes back the value the list opened on.
-        |
-        | The write bypasses stock's setter, and with it whatever makes the page
-        | redraw at once, so the view is invalidated here after each change.
         | ------------------------------------------------------------------
-        .equ    VIEW_INVALIDATE, 0x40078514
         .align  2
-        .globl  lfo_rnd_delta_gate
-lfo_rnd_delta_gate:
-delta_gate:
-        move.l  %sp@(20),%d0
-        subq.l  #ID_FIRST,%d0
-        moveq   #3,%d1
-        cmp.l   %d1,%d0
-        bhi.s   9f
-        move.l  %d0,%d3                           | field
-        move.l  %sp@(24),%d2
+lfo_rnd_delta:
+        lea     -12(%sp),%sp
+        movem.l %d2-%d3/%a2,(%sp)                 | view 16, id 20, delta 24
+        move.l  16(%sp),%a2                       | the view, for shared_mark_changed
+        move.l  20(%sp),%d3
+        subq.l  #ID_FIRST,%d3                     | field
+        move.l  24(%sp),%d2
         asr.l   #8,%d2                            | whole steps, sign preserved
         beq.s   7f
         move.l  %d3,%d1
@@ -294,60 +227,49 @@ delta_gate:
         move.l  %sp@(24),-(%sp)                   | clear it in the kit's bank too
         jsr     shared_mark_changed
         addq.l  #8,%sp
-3:      jsr     notify                            | elemod 1.1: was shared_mark_changed
-        move.l  %a2,-(%sp)                        | the view
-        jsr     VIEW_INVALIDATE                   | redraw now, not on the next refresh
-        addq.l  #4,%sp
-7:      movem.l (%sp),%d2-%d3/%a2                 | param_apply_delta's epilogue
+3:      jsr     notify
+7:      movem.l (%sp),%d2-%d3/%a2
         lea     12(%sp),%sp
+        moveq   #1,%d0
         rts
-9:      mvzb    %d3,%d3                           | displaced
-        move.l  %a2@(116),-(%sp)                  | displaced
-        jmp     param_apply_delta_track
 
         | ------------------------------------------------------------------
-        | param_value_text for ids 1..4.
+        | text(t), core_params: ids 1..4' text; t = {obj, id, value, buf}.
         |
-        | Reached by a jmp over `movel %sp@(32),%d2; movel %sp@(36),%d3`, after
-        | the prologue: %sp@(0..19) holds d2-d4/a2-a3, d4 is the id, %sp@(36)
-        | the output buffer. The text comes from the sound, not the passed value:
-        | a destination prints its parameter's short name for the sound's
-        | machine, a depth prints N.
+        | The text comes from the sound, not the passed value: a destination
+        | prints its parameter's short name for the sound's machine, a depth
+        | prints N.
         | ------------------------------------------------------------------
         .align  2
-        .globl  lfo_rnd_text_gate
-lfo_rnd_text_gate:
-text_gate:
-        move.l  %d4,%d0
+lfo_rnd_text:
+        move.l  %d2,-(%sp)
+        move.l  8(%sp),%a0
+        move.l  4(%a0),%d0
         subq.l  #ID_FIRST,%d0
-        moveq   #3,%d1
-        cmp.l   %d1,%d0
-        bhi.w   9f
         move.l  %d0,%d2                           | field
         move.l  %d0,%d1
         bsr.w   nibble                            | d0 = 0..15
-        move.l  %sp@(36),%a1                      | output
         btst    #0,%d2
         bne.s   5f
 
         lea     dst_indices,%a0
         mvzb    %a0@(0,%d0:l),%d0                 | position -> container index
         bsr.w   dst_name                          | a0 = the destination's name
-        move.l  %sp@(36),%a1
+        move.l  8(%sp),%a1
+        move.l  12(%a1),%a1                       | output
 1:      move.b  (%a0)+,(%a1)+
         bne.s   1b
         bra.s   8f
 
-5:      lea     shared_amounts,%a0
+5:      move.l  8(%sp),%a1
+        move.l  12(%a1),%a1                       | output
+        lea     shared_amounts,%a0
         mvzb    %a0@(0,%d0:l),%d0                 | N
         jsr     shared_fmt_u8
 
-8:      movem.l (%sp),%d2-%d4/%a2-%a3             | param_value_text's epilogue
-        lea     20(%sp),%sp
+8:      move.l  (%sp)+,%d2
+        moveq   #1,%d0
         rts
-9:      movel   %sp@(32),%d2                      | displaced
-        movel   %sp@(36),%d3                      | displaced
-        jmp     param_value_text_args
 
         | ------------------------------------------------------------------
         | dst_name(d0 = container index) -> a0 = its short name
@@ -845,15 +767,20 @@ audio_gate:
         | Data
         | ------------------------------------------------------------------
         .align  2
-        .globl  lfo_rnd_lfo_pages
-lfo_rnd_lfo_pages:
-lfo_pages:                                        | the voice LFO view's pages
-        .long   PAGE_LFO, PAGE_RND
+        .globl  lfo_rnd_view_page                 | core_view_pages: behind LFO
+lfo_rnd_view_page:
+        .long   4, PAGE_RND, 0                    | CORE_VIEW_LFO, always shown
 
+        .globl  lfo_rnd_page, lfo_rnd_params
+lfo_rnd_page:                                     | core_pages: page 12
+        .long   PAGE_RND
 page_rnd:                                         | {name, top row, bottom row}
         .long   str_page
         .long   1, 3, 0, 0
         .long   2, 4, 0, 0
+
+lfo_rnd_params:                                   | core_params: ids 1..4
+        .long   ID_FIRST, ID_FIRST+3, lfo_rnd_get, lfo_rnd_delta, lfo_rnd_text
 
         | Destination list: the 8 machine parameters, then sample FIN and STA,
         | filter FRQ and RES, amp DEC and PAN, DEL and REV sends.

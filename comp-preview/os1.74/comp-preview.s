@@ -233,6 +233,12 @@
         .endif
         .equ    VIEW_SELPAGE,   0x8c
         .equ    VIEW_PAGEKEY,   0x88              | the view's own page key's id
+        | elemod: the view's page list (a vector: its first element), so the
+        | preview is told apart by its page, 11 again past the first entry,
+        | rather than by any entry past the first: core-ar2 0.4 lists other
+        | mods' pages in the same view (duck's DUCK).
+        .equ    VIEW_PAGES,     0x7c
+        .equ    PAGE_COMP,      11
         | Set on a page key's press when it is the view's own; its release cycles
         | the page only while it is set (0x4003ab08, 0x4003a834).
         .equ    CYCLE_ARMED,    0x417e32b9
@@ -276,6 +282,9 @@
         .equ    UI_QUEUE,       0x41943f54
         .equ    QUEUE_MAX,      8
         .equ    QUEUE_BUSY,     6
+        .equ    LOAD_OFF,       243               | 95% of the block (core's window)
+        .equ    LOAD_ON,        225               | 88%
+        .extern core_audio_load
         .equ    BGWORKER_P,     0x419f2898
         .equ    BG_WAIT,        375
         .equ    BG_NUDGE,       30
@@ -329,7 +338,26 @@ comp_probe:
         .if     P_NOEST
         bra     probe_out                         | the estimator switched off
         .endif
-        move.l  UI_QUEUE+4,%d0
+        | The audio interrupt's load (core-ar2 0.4's core_audio_load, the last
+        | block's share in 256ths): past LOAD_OFF the estimate stands aside, so
+        | stock's audio and the UI keep their time, and it comes back below
+        | LOAD_ON. The gap is more than the estimate's own cost (4 to 5% on the
+        | unit, 2026-10-21), so it does not run every other block. On the unit
+        | the busiest build measured (DAC SUM, a chorus send and the estimate)
+        | peaked at 95% of the block, with no artefacts; stock alone at 84%.
+        move.l  core_audio_load,%d0
+        tst.b   aud_off
+        beq.s   3f
+        cmp.l   #LOAD_ON,%d0
+        bcc     probe_out                         | still busy
+        clr.b   aud_off
+        bra.s   4f
+3:      cmp.l   #LOAD_OFF,%d0
+        bls.s   4f
+        moveq   #1,%d0
+        move.b  %d0,aud_off
+        bra     probe_out
+4:      move.l  UI_QUEUE+4,%d0
         moveq   #QUEUE_MAX,%d1
         cmp.l   %d1,%d0
         bgt     probe_out                         | the UI is behind: stand aside
@@ -975,8 +1003,12 @@ comp_draw:
         .endif
         move.l  4(%sp),%a0
         move.l  VIEW_SELPAGE(%a0),%d0
-        bne.s   1f
-        jmp     PARAM_DRAW
+        beq.s   0f
+        move.l  VIEW_PAGES(%a0),%a1               | elemod: the preview's page?
+        moveq   #PAGE_COMP,%d1
+        cmp.l   (%a1,%d0.l*4),%d1
+        beq.s   1f
+0:      jmp     PARAM_DRAW
 
 1:
         moveq   #TRACE_THR,%d1
@@ -1135,8 +1167,12 @@ draw_seg:
 comp_preview_comp_keys:
 comp_keys:
         move.l  4(%sp),%a0
-        tst.l   VIEW_SELPAGE(%a0)
+        move.l  VIEW_SELPAGE(%a0),%d0
         beq.s   9f
+        move.l  VIEW_PAGES(%a0),%a1               | elemod: the preview's page?
+        moveq   #PAGE_COMP,%d1
+        cmp.l   (%a1,%d0.l*4),%d1
+        bne.s   9f
         move.l  8(%sp),%a1
         btst    #0,19(%a1)
         beq.s   9f                                | not a press
@@ -1191,24 +1227,9 @@ comp_keys:
 8:      moveq   #1,%d0                            | handled
         rts
 
-        | ------------------------------------------------------------------
-        | comp_setsel - the compressor vtable's set-sub-page slot, +0x60. The FX
-        | page code at 0x400cbcd4 shows the view and then, when the page shown
-        | before it was a different one, sets its sub-page to 0 - so coming back
-        | drew the preview for a frame and then dropped to the stock page. A
-        | request for 0 is taken as a request for the current sub-page; stock's
-        | setter still runs, with its redraw.
-        | ------------------------------------------------------------------
-        .equ    STOCK_SETSEL,   0x4003762e
-        .align  2
-        .globl  comp_preview_comp_setsel
-comp_preview_comp_setsel:
-comp_setsel:
-        tst.l   8(%sp)
-        bne.s   1f
-        move.l  4(%sp),%a0                        | the view
-        move.l  VIEW_SELPAGE(%a0),8(%sp)
-1:      jmp     STOCK_SETSEL
+        | The COMP view keeps its page when the FX track shows it again: core-ar2
+        | 0.4 does that for every view (1.0 and 1.1's first builds took the
+        | compressor vtable's set-page slot, +0x60, here).
         .align  2
 
 
@@ -1611,13 +1632,11 @@ grmode:
 hrestab:
         .byte   86,43,22,11,5,3
         .balign 4
-        | The page vector source: stock page 11 twice, stock and the preview,
-        | read once by the constructor.
-        .globl  comp_preview_comp_pages
-comp_preview_comp_pages:
-comp_pages:
-        .long   11
-        .long   11
+        | elemod: the preview, stock page 11 listed again in the COMP view,
+        | through core-ar2 0.4's core_view_pages: {CORE_VIEW_COMP, 11}.
+        .globl  comp_preview_view_page
+comp_preview_view_page:
+        .long   8, 11, 0                          | always shown
         .align  2
         | Per ratio, indexed by the stored RAT value, hardest first (the device
         | labels 0..3 1:2, 1:4, 1:8, MAX): knee Q8 dB, width Q8 dB, 2^22 / width,
@@ -2247,6 +2266,8 @@ cal_mup:
 coef:
         .space  64, 0
         | Blocks left before the producer idles; re-armed by the draw slot.
+aud_off:        .byte   0                         | standing aside for the audio's load
+        .align  2
 seen:
         .long   0
         | The enumerations' last drawn values, the map entry last changed (0

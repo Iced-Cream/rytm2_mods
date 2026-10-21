@@ -1,11 +1,11 @@
 {
  "id": "comp-preview",
- "version": "1.0",
+ "version": "1.1",
  "title": "Compressor gain-reduction preview",
  "category": "Display",
  "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
  "license": "GPL-2.0-only",
- "description": "One more compressor page holding a scrolling trace of estimated gain reduction, reached by pressing the compressor page key again, which then returns to the stock page. FUNC + the page key switches its layout: the level, threshold and GR together, or GR alone with 0 dB at the top. It is stock page 11 listed twice in the view's page vector rather than a new page id, so stock's parameter lookup, title and encoder mapping are inherited unchanged and the entries are told apart by the view's selected index in the draw slot. The estimate builds each side of the compressor's input from the audio interrupt's receive buffer - the eight voice slots split by pan, dropped when off the main bus, slots 5 and 6 trimmed, plus the PRE delay and reverb returns - through the master distortion and its symmetry and each SEQ's sidechain, into a 5 ms peak detector on the louder side. A static curve that THR slides along the level axis gives the demand, and one attack/release pole a block follows it. The model and every calibrated value: re/subsystems/compressor-model.md. Hardware-verified 2026-09-20: the page, hook, renderer, scroll and producer all run, and an on-device null of the input model against the MAIN pair reads near zero. Accuracy and known limits: re/subsystems/compressor-model.md. The main ones: on random settings over drum patterns it was not fitted on, the estimate reads 1.6 dB rms from the measured reduction with no bias (2026-09-26), a steady tone 0.56; DIST symmetry away from 64 is outside the model; the reduction past 36 dB is capped; POST returns are not modelled and PRE returns join the sum about 4 ms early; and material whose crest factor is far from the calibration tone's reads off. Port of rytm-mods 0006-comp-preview.",
+ "description": "One more compressor page holding a scrolling trace of estimated gain reduction, reached by pressing the compressor page key again, which then returns to the stock page. FUNC + the page key switches its layout: the level, threshold and GR together, or GR alone with 0 dB at the top. It is stock page 11 listed twice in the view's page vector rather than a new page id, so stock's parameter lookup, title and encoder mapping are inherited unchanged and the entries are told apart by the view's selected index in the draw slot. The estimate builds each side of the compressor's input from the audio interrupt's receive buffer - the eight voice slots split by pan, dropped when off the main bus, slots 5 and 6 trimmed, plus the PRE delay and reverb returns - through the master distortion and its symmetry and each SEQ's sidechain, into a 5 ms peak detector on the louder side. A static curve that THR slides along the level axis gives the demand, and one attack/release pole a block follows it. The model and every calibrated value: re/subsystems/compressor-model.md. Hardware-verified 2026-09-20: the page, hook, renderer, scroll and producer all run, and an on-device null of the input model against the MAIN pair reads near zero. Accuracy and known limits: re/subsystems/compressor-model.md. The main ones: on random settings over drum patterns it was not fitted on, the estimate reads 1.6 dB rms from the measured reduction with no bias (2026-09-26), a steady tone 0.56; DIST symmetry away from 64 is outside the model; the reduction past 36 dB is capped; POST returns are not modelled and PRE returns join the sum about 4 ms early; and material whose crest factor is far from the calibration tone's reads off. Port of rytm-mods 0006-comp-preview. From 1.1 the preview is listed in the COMP view through core-ar2 0.4's page lists, so other mods' pages can sit beside it (needs core 0.4, OS 1.74 only).",
  "device": "analog-rytm-mk2",
  "os": "1.73",
  "sources": [
@@ -19,19 +19,6 @@
    "target": "comp_preview_comp_probe"
   },
   {
-   "addr": "0x400cb182",
-   "stock": "7201",
-   "op": "bytes",
-   "new": "7202",
-   "kind": "code"
-  },
-  {
-   "addr": "0x400cb186",
-   "stock": "203c401e1b04",
-   "op": "keep2",
-   "target": "comp_preview_comp_pages"
-  },
-  {
    "addr": "0x401e11b0",
    "stock": "4003a544",
    "op": "ptr",
@@ -42,12 +29,6 @@
    "stock": "400c674c",
    "op": "ptr",
    "target": "comp_preview_comp_draw"
-  },
-  {
-   "addr": "0x401e1208",
-   "stock": "4003762e",
-   "op": "ptr",
-   "target": "comp_preview_comp_setsel"
   }
  ],
  "requires": [
@@ -66,19 +47,6 @@
      "target": "comp_preview_comp_probe"
     },
     {
-     "addr": "0x400cb1ee",
-     "stock": "7201",
-     "op": "bytes",
-     "new": "7202",
-     "kind": "code"
-    },
-    {
-     "addr": "0x400cb1f2",
-     "stock": "203c401e1db4",
-     "op": "keep2",
-     "target": "comp_preview_comp_pages"
-    },
-    {
      "addr": "0x401e1460",
      "stock": "4003a544",
      "op": "ptr",
@@ -89,14 +57,26 @@
      "stock": "400c67b8",
      "op": "ptr",
      "target": "comp_preview_comp_draw"
-    },
-    {
-     "addr": "0x401e14b8",
-     "stock": "4003762e",
-     "op": "ptr",
-     "target": "comp_preview_comp_setsel"
     }
    ]
   }
+ },
+ "contribute": [
+  {
+   "to": "core_view_pages",
+   "order": 20,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:comp_preview_view_page",
+     0
+    ]
+   ]
+  }
+ ],
+ "resources": {
+  "core": "0.4"
  }
 }
