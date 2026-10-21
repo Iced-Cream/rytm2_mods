@@ -133,7 +133,7 @@ with core 0.4 (their sites overlap core's), and 1.2 does not link with core 0.3.
 
 - rytm-emu, OS 1.74, core-ar2 0.4 with all eleven mods against the v1.2 release build (core 0.3):
   LFO RND's page and its four knobs, every screen of the same key and knob sequence pixel-identical.
-- Hardware, Analog Rytm MKII OS 1.74, 2026-10-21, core-ar2 0.4 with all eleven mods (P4A4, then Q4A4 with the page-key lists): every test step passes.
+- Hardware, Analog Rytm MKII OS 1.74, 2026-10-21, core-ar2 0.4 with all eleven mods (P4A4, then Q4A4 with the page-key lists): every test step passes. With core's page step and title (U4A4): LFO steps LFO, LFO RND, LFO, the header following.
 
 ### 1.1 (core-ar2 0.2 storage)
 

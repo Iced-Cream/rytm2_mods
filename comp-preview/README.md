@@ -69,7 +69,7 @@ view, so DUCK and any other added page are kept too, with or without comp-previe
 - rytm-emu, OS 1.74: without duck, FX then AMP through COMP and the preview, 9 screens
   pixel-identical to 1.0 on core 0.4. With duck: COMP, preview, DUCK, COMP, preview, DUCK; DUCK's
   knobs turn.
-- Hardware, Analog Rytm MKII OS 1.74, 2026-10-21, core-ar2 0.4: in the full build (Q4A4) COMP and the preview cycle, the preview's FUNC keys work and it is kept on leaving the FX track; with duck (Q4D4) COMP, preview, DUCK cycle and the preview's trace runs while DUCK ducks. Open: with cpu-probe in the build (Q4D4, and Q4F4 without duck), CPU reads 100% now and then and the preview's trace freezes; being narrowed down.
+- Hardware, Analog Rytm MKII OS 1.74, 2026-10-21, core-ar2 0.4: in the full build (Q4A4) COMP and the preview cycle, the preview's FUNC keys work and it is kept on leaving the FX track; with duck (Q4D4) COMP, preview, DUCK cycle and the preview's trace runs while DUCK ducks. With cpu-probe in the build (Q4D4, and Q4F4 without duck), CPU read 100% now and then and the preview's trace stopped, coming back by itself. Then with the load guard (U4A4, U4D4, U4F4, U4M4): the preview is kept on the COMP view with and without duck; in the busiest case (DAC SUM, fx-sends' chorus and the preview) CPU still touches 100%, the audio interrupt reads 92% and peaks at 94%, the trace stops now and then and comes back by itself, knobs and values keep responding meanwhile, and nothing is audible. The guard rarely engages at these loads.
 
 - Built with elekloader at d17478b and m68k-linux-gnu binutils 2.42: `.run` 3856 B,
   6 sites, 19 relocations; lint OK; links with core-ar2 0.1 and the other ports.
