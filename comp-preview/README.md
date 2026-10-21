@@ -65,7 +65,7 @@ on when you come back to it (so the preview is not dropped), and that now applie
 - rytm-emu, OS 1.74: without duck, FX then AMP through COMP and the preview, 9 screens
   pixel-identical to 1.0 on core 0.4. With duck: COMP, preview, DUCK, COMP, preview, DUCK; DUCK's
   knobs turn.
-- Hardware, Analog Rytm MKII OS 1.74, 2026-10-21, core-ar2 0.4: in the full build (Q4A4) COMP and the preview cycle, the preview's FUNC keys work and it is kept on leaving the FX track; with duck (Q4D4) COMP, preview, DUCK cycle and the preview's trace runs while DUCK ducks. Every test step passes.
+- Hardware, Analog Rytm MKII OS 1.74, 2026-10-21, core-ar2 0.4: in the full build (Q4A4) COMP and the preview cycle, the preview's FUNC keys work and it is kept on leaving the FX track; with duck (Q4D4) COMP, preview, DUCK cycle and the preview's trace runs while DUCK ducks. Open: with cpu-probe in the build (Q4D4, and Q4F4 without duck), CPU reads 100% now and then and the preview's trace freezes; being narrowed down.
 
 - Built with elekloader at d17478b and m68k-linux-gnu binutils 2.42: `.run` 3856 B,
   6 sites, 19 relocations; lint OK; links with core-ar2 0.1 and the other ports.
