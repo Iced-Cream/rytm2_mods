@@ -282,6 +282,9 @@
         .equ    UI_QUEUE,       0x41943f54
         .equ    QUEUE_MAX,      8
         .equ    QUEUE_BUSY,     6
+        .equ    LOAD_OFF,       243               | 95% of the block (core's window)
+        .equ    LOAD_ON,        225               | 88%
+        .extern core_audio_load
         .equ    BGWORKER_P,     0x419f2898
         .equ    BG_WAIT,        375
         .equ    BG_NUDGE,       30
@@ -335,7 +338,26 @@ comp_probe:
         .if     P_NOEST
         bra     probe_out                         | the estimator switched off
         .endif
-        move.l  UI_QUEUE+4,%d0
+        | The audio interrupt's load (core-ar2 0.4's core_audio_load, the last
+        | block's share in 256ths): past LOAD_OFF the estimate stands aside, so
+        | stock's audio and the UI keep their time, and it comes back below
+        | LOAD_ON. The gap is more than the estimate's own cost (4 to 5% on the
+        | unit, 2026-10-21), so it does not run every other block. On the unit
+        | the busiest build measured (DAC SUM, a chorus send and the estimate)
+        | peaked at 95% of the block, with no artefacts; stock alone at 84%.
+        move.l  core_audio_load,%d0
+        tst.b   aud_off
+        beq.s   3f
+        cmp.l   #LOAD_ON,%d0
+        bcc     probe_out                         | still busy
+        clr.b   aud_off
+        bra.s   4f
+3:      cmp.l   #LOAD_OFF,%d0
+        bls.s   4f
+        moveq   #1,%d0
+        move.b  %d0,aud_off
+        bra     probe_out
+4:      move.l  UI_QUEUE+4,%d0
         moveq   #QUEUE_MAX,%d1
         cmp.l   %d1,%d0
         bgt     probe_out                         | the UI is behind: stand aside
@@ -2244,6 +2266,8 @@ cal_mup:
 coef:
         .space  64, 0
         | Blocks left before the producer idles; re-armed by the draw slot.
+aud_off:        .byte   0                         | standing aside for the audio's load
+        .align  2
 seen:
         .long   0
         | The enumerations' last drawn values, the map entry last changed (0

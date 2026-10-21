@@ -35,7 +35,10 @@ page behind the COMP key: duck, which adds DUCK there, was refused beside it. Co
 each page key's list from stock's pages and the pages mods add. comp-preview now adds its entry
 there, and its draw and key hooks tell the preview apart by its page (11 again, past the
 first entry) rather than by "any entry past the first", so a page another mod adds after it is
-left alone. With duck the COMP key steps COMP, preview, DUCK. The preview itself is unchanged.
+left alone. With duck the COMP key steps COMP, preview, DUCK. The preview itself is unchanged, but for one guard: its estimate in the audio interrupt stands
+aside while core-ar2 0.4's `core_audio_load` says the last block was over 95% busy, and comes
+back below 88%, so the trace pauses rather than the audio or the UI running short. Stock alone
+peaks near 84% on a unit; the estimate costs 4 to 5 points.
 Needs core-ar2 0.4 (OS 1.74 only); 1.0 does not link with core 0.4.
 
 The COMP view keeps the page it was on when you come back to it, so the preview is not dropped.
