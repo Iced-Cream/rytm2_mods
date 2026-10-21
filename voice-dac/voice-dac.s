@@ -52,14 +52,12 @@
         |   vs_alt        0x4011fde2  the same on the interrupt's other path
         |   dac_menu_add  0x400d901c  the menu's item list: DAC SUM after USB TO MAIN
         |   t_emit        0x40121396  timing only: the timing words, before USB
-        | and, for the page and its knobs, chained behind 0004's gates where 0004
-        | is built and standing alone where it is not:
-        |   hpf_page_info 0x400ff592  page_info's out-of-range return: page 13
+        | and, for the page and its knobs (page 13 and its ids are in core-ar2
+        | 0.4's core_pages and core_params: core asks vd_param_get, _delta and
+        | _text below for them; 1.2 detoured page_info, page_get_value,
+        | param_apply_delta and param_value_text itself):
         |   hpf_cycle     0x4003ab86  the page key's cycle: FILTER's page 2 only
         |                             while DAC SUM is on
-        |   hpf_get       0x4003846a  page_get_value: the dials, ids 5, 11, 12
-        |   hpf_delta     0x400378bc  param_apply_delta: the knobs
-        |   hpf_text      0x400a85f8  param_value_text: the popups
         |   flt_glyph     0x400a8584  param_knob_draw: TYP as stock's TYP glyph
         |   flt_graph     0x400d2e42  sound_page_draw: stock's FILTER graph
         | and for the caches the audio interrupt reads:
@@ -220,13 +218,7 @@
         .equ    TRIG_KEYS,      16                | key ids 0..15, as 0014
         .equ    PROJ_TRACKSEL,  48                | as 0000-shared's
         .equ    VIEW_INVALIDATE, 0x40078514
-        .equ    PAGE_DEFAULT,   0x401ec570        | page_info's answer above 11
         .equ    CYCLE_RESUME,   0x4003ab8c
-        .equ    GET_RESUME,     0x40038472
-        .equ    DELTA_RESUME,   0x400378c2
-        .equ    DELTA_CALL,     0x400b68d2
-        .equ    TEXT_RESUME,    0x400a8600
-        .equ    TEXT_CALL,      0x400ff556
         .equ    IDLE_RESUME,    0x400a2ab6
         | DAC SUM, the global field vd_dac. ProjectGlobals is the project's
         | member at +236; its vtable +52 answers the active live record, and
@@ -836,25 +828,22 @@ t_clip: .long   0
         | rts: page 13 answers the DAC FILTER page. Reached with d0 the page id, from the
         | range compare 0004 rejoins at when it is built.
         | ------------------------------------------------------------------
-        .align  2
-        .globl  voice_dac_hpf_page_info
-voice_dac_hpf_page_info:
-hpf_page_info:
-        moveq   #PAGE_HPF,%d1
-        cmp.l   %d1,%d0
-        bne.s   1f
-        move.l  #page_hpf,%d0
-        rts
-1:      move.l  #PAGE_DEFAULT,%d0                 | displaced
-        rts                                       | as stock's, after it
-
         | The DAC FILTER page: FRQ, RES, TYP and DEP along the top row, the
         | first three in stock's FILTER order, the graph drawn over FRQ and
         | RES; the transient shaper's ATK and SUS and POL along the bottom.
         .align  2
+        .globl  voice_dac_page
+voice_dac_page:                                   | core_pages: page 13
+        .long   PAGE_HPF
 page_hpf:
         .long   txt_page
         .long   ID_FRQ, ID_RES, ID_TYP, ID_DEP, ID_ATK, ID_SUS, ID_POL, 0
+        | core_params: the page's ids, 5, 7, 11..14 and 457
+        .globl  voice_dac_p5, voice_dac_p7, voice_dac_p11, voice_dac_p457
+voice_dac_p5:   .long   ID_FRQ, ID_FRQ, vd_param_get, vd_param_delta, vd_param_text
+voice_dac_p7:   .long   ID_ATK, ID_ATK, vd_param_get, vd_param_delta, vd_param_text
+voice_dac_p11:  .long   ID_TYP, ID_SUS, vd_param_get, vd_param_delta, vd_param_text
+voice_dac_p457: .long   ID_POL, ID_POL, vd_param_get, vd_param_delta, vd_param_text
         | The FILTER view's page vector, FILTER and then DAC FILTER.
         .globl  voice_dac_filter_pages
 voice_dac_filter_pages:
@@ -2190,61 +2179,57 @@ shp_gain:
         | The knob gates: page_get_value, param_apply_delta and
         | param_value_text for the page's ids, in cave12 with the other UI code.
         | ------------------------------------------------------------------
-        | page_get_value for ids 5, 11 and 12, the dials: after the prologue,
-        | over `moveal %sp@(16),%a2; movel %sp@(20),%d2`, where 0004's gate
-        | rejoins. The frame holds d2/d3/a2; 20(%sp) is the id. The value in
-        | 8.8: TYP 0..2, FRQ and DEP 0..127.
+        | get(id, *value), core_params: the dials. The value in 8.8: TYP
+        | 0..7, FRQ, RES and DEP 0..127, ATK and SUS 0..127 (64 the centre),
+        | POL 0..1.
         | ------------------------------------------------------------------
         .align  2
-        .globl  voice_dac_hpf_get
-voice_dac_hpf_get:
-hpf_get:
-        move.l  20(%sp),%d0
+vd_param_get:
+        move.l  %d2,-(%sp)                        | id 8, value 12
+        move.l  8(%sp),%d0
         jsr     flt_ours
         bne.s   10f
-        move.l  20(%sp),%d1
+        move.l  8(%sp),%d1
         jsr     flt_shift
         move.l  %d1,%d2
         jsr     flt_cur
         lsr.l   %d2,%d0
         and.l   #0xff,%d0
         lsl.l   #8,%d0
-        movem.l (%sp),%d2-%d3/%a2                 | page_get_value's epilogue
-        lea     12(%sp),%sp
-        rts
-10:     move.l  20(%sp),%d0
+        bra.s   8f
+10:     move.l  8(%sp),%d0
         jsr     shp_ours
         bne.s   9f
-        move.l  20(%sp),%d0
+        move.l  8(%sp),%d0
         jsr     shp_get
-        movem.l (%sp),%d2-%d3/%a2                 | page_get_value's epilogue
-        lea     12(%sp),%sp
+8:      move.l  12(%sp),%a0
+        move.l  %d0,(%a0)
+        move.l  (%sp)+,%d2
+        moveq   #1,%d0
         rts
-9:      move.l  16(%sp),%a2                       | displaced
-        move.l  20(%sp),%d2                       | displaced
-        jmp     GET_RESUME
+9:      move.l  (%sp)+,%d2
+        moveq   #0,%d0
+        rts
 
         | ------------------------------------------------------------------
-        | param_apply_delta for ids 5, 11 and 12, the knobs: over `jsr
-        | 0x400b68d2`, where 0004's gate rejoins, with a2@(116) already pushed
-        | as its argument. The frame holds d2/d3/a2 above that; 24(%sp) is the
-        | id, 28(%sp) the delta in 8.8, a2 the view. A step a whole unit of
-        | delta - for TYP, whose encoder range is stock TYP's (flt_knobs) and so
-        | its deltas fractions, a sum carried in flt_typ_acc, as stock keeps
-        | its 8.8 value's fraction - clamped to 0..7 for TYP and 0..127 for FRQ, RES and DEP; stock never
-        | sees the id, so no lock is made. The view is invalidated after, as
-        | nothing stock does redraws it.
+        | delta(view, id, delta, func), core_params: the knobs. A step a
+        | whole unit of delta - for TYP, whose encoder range is stock TYP's
+        | (flt_knobs) and so its deltas fractions, a sum carried in
+        | flt_typ_acc, as stock keeps its 8.8 value's fraction - clamped to
+        | 0..7 for TYP and 0..127 for FRQ, RES and DEP. Taking the turn means
+        | stock never sees the id, so no lock is made; core redraws the view.
         | ------------------------------------------------------------------
         .align  2
-        .globl  voice_dac_hpf_delta
-voice_dac_hpf_delta:
-hpf_delta:
-        move.l  24(%sp),%d0
+vd_param_delta:
+        lea     -12(%sp),%sp
+        movem.l %d2-%d3/%a2,(%sp)                 | view 16, id 20, delta 24, func 28
+        move.l  16(%sp),%a2
+        move.l  20(%sp),%d0
         jsr     flt_ours
         bne.w   10f
-        move.l  28(%sp),%d2
+        move.l  24(%sp),%d2
         moveq   #ID_TYP,%d0
-        cmp.l   24(%sp),%d0
+        cmp.l   20(%sp),%d0
         bne.s   4f
         add.l   flt_typ_acc,%d2                   | TYP: whole steps toward zero,
         move.l  %d2,%d0                           | the fraction kept for the next
@@ -2263,7 +2248,7 @@ hpf_delta:
 4:      asr.l   #8,%d2                            | whole steps, sign preserved
 8:      tst.l   %d2
         beq.w   7f
-        move.l  24(%sp),%d0                       | the id
+        move.l  20(%sp),%d0                       | the id
         move.l  %d2,%d1                           | the steps
         moveq   #ID_TYP,%d3
         cmp.l   %d0,%d3
@@ -2277,31 +2262,27 @@ hpf_delta:
         moveq   #ID_TYP,%d0
         lea     flt_to,%a1
         jsr     ca_each
-        bra.s   12f
+        bra.s   7f
 11:     lea     flt_step,%a1
         jsr     ca_each
-12:     move.l  %a2,-(%sp)
-        jsr     VIEW_INVALIDATE
-        addq.l  #4,%sp
-7:      addq.l  #4,%sp                            | the pushed argument
-        movem.l (%sp),%d2-%d3/%a2                 | param_apply_delta's epilogue
+7:      movem.l (%sp),%d2-%d3/%a2
         lea     12(%sp),%sp
+        moveq   #1,%d0
         rts
-10:     move.l  24(%sp),%d0
+10:     move.l  20(%sp),%d0
         jsr     shp_ours
         bne.s   9f
-        move.l  24(%sp),%d0
-        move.l  28(%sp),%d1
-        move.l  32(%sp),%d2
+        move.l  20(%sp),%d0
+        move.l  24(%sp),%d1
+        move.l  28(%sp),%d2
         and.l   #0xff,%d2                         | funcHeld
         lea     shp_delta,%a1
         jsr     ca_each
-        move.l  %a2,-(%sp)
-        jsr     VIEW_INVALIDATE
-        addq.l  #4,%sp
-        bra.w   7b
-9:      jsr     DELTA_CALL                        | displaced
-        jmp     DELTA_RESUME
+        bra.s   7b
+9:      movem.l (%sp),%d2-%d3/%a2
+        lea     12(%sp),%sp
+        moveq   #0,%d0
+        rts
 
         | ------------------------------------------------------------------
         | flt_step(d0 = id, d1 = whole steps): the field moved by the steps,
@@ -2450,23 +2431,24 @@ ca_each:
         rts
 
         | ------------------------------------------------------------------
-        | param_value_text for ids 5, 11 and 12, the popups: over `movel
-        | %d4,%sp@-` and the first half of `jsr 0x400ff556`, where 0004's gate
-        | rejoins. The frame holds d2-d4/a2-a3; d4 is the id, d3 the output
-        | buffer. The value is read from the selected track's sound into d2,
-        | in 8.8, as stock's value argument is not ours for these ids (it read
-        | 0 on the device). FRQ goes on as stock's FRQ, id 47, so it
-        | reads as stock's does - in hertz where 0008 is built, whose gate
-        | follows. RES goes on as stock's RES, id 48. TYP goes on as stock's
-        | TYP, id 49, at its index for ours (flt_stock_typ); OFF is written
-        | here. DEP is written here: "0.0dB", "-0.3dB" .. "-31.5dB" to the
-        | tenth, then "FULL"; for PK, a boost, "+0.0dB" .. "+6.0dB". d4 and d2
-        | are the frame's and restored by the epilogue.
+        | text(t), core_params: the popups; t = {obj, id, value, buf}. The
+        | value is read from the selected track's sound, in 8.8, as stock's
+        | value argument is not ours for these ids (it read 0 on the device).
+        | FRQ goes on as stock's FRQ, id 47, so it reads as stock's does - in
+        | hertz where filter-hz is built, whose gate follows. RES goes on as
+        | stock's RES, id 48. TYP goes on as stock's TYP, id 49, at its index
+        | for ours (flt_stock_typ); OFF is written here. DEP is written here:
+        | "0.0dB", "-0.3dB" .. "-31.5dB" to the tenth, then "FULL"; for PK, a
+        | boost, "+0.0dB" .. "+6.0dB". "Goes on" is core's answer 2, with t's
+        | id and value changed.
         | ------------------------------------------------------------------
         .align  2
-        .globl  voice_dac_hpf_text
-voice_dac_hpf_text:
-hpf_text:
+vd_param_text:
+        lea     -16(%sp),%sp
+        movem.l %d2-%d4/%a2,(%sp)                 | t 20
+        move.l  20(%sp),%a2
+        move.l  4(%a2),%d4                        | the id
+        move.l  12(%a2),%d3                       | the output buffer
         move.l  %d4,%d0
         jsr     flt_ours
         bne.w   11f
@@ -2550,21 +2532,24 @@ hpf_text:
         lea     txt_db,%a0
 5:      move.b  (%a0)+,(%a1)+
         bne.s   5b
-        movem.l (%sp),%d2-%d4/%a2-%a3             | param_value_text's epilogue
-        lea     20(%sp),%sp
-        rts
+        moveq   #1,%d0                            | written
+        bra.s   99f
 11:     move.l  %d4,%d0
         jsr     shp_ours
-        bne.s   9f
+        bne.s   98f
         move.l  %d4,%d0
         move.l  %d3,%a1
         jsr     shp_text
-        movem.l (%sp),%d2-%d4/%a2-%a3             | param_value_text's epilogue
-        lea     20(%sp),%sp
+        moveq   #1,%d0                            | written
+        bra.s   99f
+9:      move.l  %d4,4(%a2)                        | stock goes on as that id,
+        move.l  %d2,8(%a2)                        | with that value
+        moveq   #2,%d0
+        bra.s   99f
+98:     moveq   #0,%d0
+99:     movem.l (%sp),%d2-%d4/%a2
+        lea     16(%sp),%sp
         rts
-9:      move.l  %d4,-(%sp)                        | displaced
-        jsr     TEXT_CALL                         | displaced
-        jmp     TEXT_RESUME
 
         | ------------------------------------------------------------------
         | param_knob_draw past its prologue, where 0004's gate rejoins

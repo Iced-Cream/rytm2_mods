@@ -60,22 +60,18 @@ checked to allocate them together).
 
 ## Sites
 
-34 sites (1.1 had 49), from the claims rytm-mods' registry makes for its default build
+30 sites (1.2 had 34, 1.1 49), from the claims rytm-mods' registry makes for its default build
 (`registry/allocations.toml`, owner `0013-voice-dac`), less the 15 that only stored, loaded, cleared or
 protected the values (1.2, below); the timing, prof, burn and dbg builds' extra claims are left out.
 Also a handler on core-ar2's `ev_project`, `voice_dac_vd_project`.
 
 | addr | op | |
 |---|---|---|
-| 0x400378bc | jmp | `jmp voice_dac_hpf_delta` |
-| 0x4003846a | jmp | `jmp voice_dac_hpf_get` |
 | 0x4003ab86 | jmp | `jmp voice_dac_hpf_cycle` |
 | 0x400a2aae | jmp | `jmp voice_dac_hpf_refresh` |
 | 0x400a8584 | jmp | `jmp voice_dac_flt_glyph` |
-| 0x400a85f8 | jmp | `jmp voice_dac_hpf_text` |
 | 0x400d2e42 | jmp | `jmp voice_dac_flt_graph` |
 | 0x400d901c | jmp | `jmp voice_dac_dac_menu_add` |
-| 0x400ff592 | jmp | `jmp voice_dac_hpf_page_info` |
 | 0x4011fde2 | jmp | `jmp voice_dac_vs_alt` |
 | 0x401212b6 | jmp | `jmp voice_dac_route_all` |
 | 0x40121364 | jmp | `jmp voice_dac_vs_main` |
@@ -102,12 +98,23 @@ Also a handler on core-ar2's `ev_project`, `voice_dac_vd_project`.
 | 0x401c5614 | ptr | pointer -> `voice_dac_txt_pol_long` |
 | 0x401c561c | ptr | pointer -> `voice_dac_txt_pol_short` |
 
+core-ar2 0.4 entries (1.3): `core_pages` `voice_dac_page` (page 13, DAC FILTER) and four `core_params` entries, `voice_dac_p5`, `voice_dac_p7`, `voice_dac_p11` (ids 11..14) and `voice_dac_p457` (`vd_param_get`, `vd_param_delta`, `vd_param_text`), in place of 1.2's four detours at the entries of page_info, page_get_value, param_apply_delta and param_value_text. FRQ, RES and TYP text still goes to stock's own ids (`text` returns 2), so filter-hz shows FRQ in Hz as before.
+
 A detour is a `jmp` site over the whole stock instructions it displaces; the stub re-emits them
 as in rytm-mods. Where rytm-mods patched the address operand of a `jsr`/`lea`/`move.l #`, the
 site is elemod's `keep2` (the opcode word kept, the address the mod's). A pointer in a data
 table is a `ptr` site.
 
 ## Changes from rytm-mods
+
+### 1.3: on core-ar2 0.4's page tables
+
+DAC FILTER's page and its knobs now go through core-ar2 0.4, which owns the entries of the
+stock page routines, instead of this mod's own detours there (Sites, above). What the unit shows
+and does is unchanged. The reason is that more than one mod can now add a page: with every mod
+jumping from the same entries, only one detour per instruction could link. Needs core-ar2 0.4
+(`"resources": {"core": "0.4"}`), OS 1.74 only; builds of voice-dac before 1.3 do not link
+with core 0.4 (their sites overlap core's), and 1.3 does not link with core 0.3.
 
 - 1.2 keeps the settings in core-ar2's mod storage (above), so its storage code differs from
   rytm-mods 0013's; the rest is unchanged.
@@ -136,6 +143,11 @@ table is a `ptr` site.
    kit save and reload and a power cycle. The VELOCITY MOD menu reads as on stock.
 
 ## Results so far
+
+### 1.3 on core-ar2 0.4
+
+- rytm-emu, OS 1.74, core-ar2 0.4 with all eleven mods against the v1.2 release build (core 0.3):
+  DAC FILTER's page and its knobs, every screen of the same key and knob sequence pixel-identical. Not on a unit yet.
 
 1.2 builds for OS 1.74 only: it needs core-ar2 0.3, which has no 1.73 port. Its 1.73 source stays
 the porting master, as for every mod here (`tools/port_os.py`).

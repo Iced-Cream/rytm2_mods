@@ -1,29 +1,17 @@
 {
  "id": "lfo-rnd",
- "version": "1.1",
+ "version": "1.2",
  "title": "LFO RND page",
  "category": "Sound",
  "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
  "license": "GPL-2.0-only",
- "description": "A second LFO page, LFO RND, reached by pressing the LFO page key again: two random modifiers per sound, each a destination (DS1/DS2, one of 16, chosen from stock's LFO DST list) and a depth (DP1/DP2, 0..64 in 16 steps). On every note trig each modifier draws a random offset for its destination, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound through core-ar2 0.2's mod storage (one 16-bit sound field), so the sound's stock bytes stay stock; sounds saved by lfo-rnd 1.0 keep their settings. Port of rytm-mods 0004-lfo-rnd.",
+ "description": "A second LFO page, LFO RND, reached by pressing the LFO page key again: two random modifiers per sound, each a destination (DS1/DS2, one of 16, chosen from stock's LFO DST list) and a depth (DP1/DP2, 0..64 in 16 steps). On every note trig each modifier draws a random offset for its destination, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound through core-ar2 0.2's mod storage (one 16-bit sound field), so the sound's stock bytes stay stock; sounds saved by lfo-rnd 1.0 keep their settings. Port of rytm-mods 0004-lfo-rnd. From 1.2 the page goes through core-ar2 0.4's page tables (needs core 0.4, OS 1.74 only).",
  "device": "analog-rytm-mk2",
  "os": "1.73",
  "sources": [
   "lfo-rnd.s"
  ],
  "sites": [
-  {
-   "addr": "0x400378b6",
-   "stock": "77832f2a0074",
-   "op": "jmp",
-   "target": "lfo_rnd_delta_gate"
-  },
-  {
-   "addr": "0x40038462",
-   "stock": "4feffff448d7040c",
-   "op": "jmp",
-   "target": "lfo_rnd_get_gate"
-  },
   {
    "addr": "0x40039d32",
    "stock": "4eb940006ea8",
@@ -67,12 +55,6 @@
    "target": "lfo_rnd_knob_draw_gate"
   },
   {
-   "addr": "0x400a85f0",
-   "stock": "242f0020262f0024",
-   "op": "jmp",
-   "target": "lfo_rnd_text_gate"
-  },
-  {
    "addr": "0x400a8dfa",
    "stock": "4feffff048d74404",
    "op": "jmp",
@@ -83,12 +65,6 @@
    "stock": "4fefffd848d704fc",
    "op": "jmp",
    "target": "lfo_rnd_setter_gate"
-  },
-  {
-   "addr": "0x400ff574",
-   "stock": "720b202f0004",
-   "op": "jmp",
-   "target": "lfo_rnd_page_info_gate"
   },
   {
    "addr": "0x40120fae",
@@ -250,7 +226,7 @@
   }
  ],
  "resources": {
-  "core": "0.2"
+  "core": "0.4"
  },
  "requires": [
   "core"
@@ -261,18 +237,6 @@
     "os1.74/lfo-rnd.s"
    ],
    "sites": [
-    {
-     "addr": "0x400378b6",
-     "stock": "77832f2a0074",
-     "op": "jmp",
-     "target": "lfo_rnd_delta_gate"
-    },
-    {
-     "addr": "0x40038462",
-     "stock": "4feffff448d7040c",
-     "op": "jmp",
-     "target": "lfo_rnd_get_gate"
-    },
     {
      "addr": "0x40039d32",
      "stock": "4eb940006ea8",
@@ -316,12 +280,6 @@
      "target": "lfo_rnd_knob_draw_gate"
     },
     {
-     "addr": "0x400a865c",
-     "stock": "242f0020262f0024",
-     "op": "jmp",
-     "target": "lfo_rnd_text_gate"
-    },
-    {
      "addr": "0x400a8e66",
      "stock": "4feffff048d74404",
      "op": "jmp",
@@ -332,12 +290,6 @@
      "stock": "4fefffd848d704fc",
      "op": "jmp",
      "target": "lfo_rnd_setter_gate"
-    },
-    {
-     "addr": "0x400ff5e0",
-     "stock": "720b202f0004",
-     "op": "jmp",
-     "target": "lfo_rnd_page_info_gate"
     },
     {
      "addr": "0x4012101a",
@@ -492,5 +444,33 @@
     }
    ]
   }
- }
+ },
+ "contribute": [
+  {
+   "to": "core_pages",
+   "order": 12,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:lfo_rnd_page",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_params",
+   "order": 12,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:lfo_rnd_params",
+     0
+    ]
+   ]
+  }
+ ]
 }
