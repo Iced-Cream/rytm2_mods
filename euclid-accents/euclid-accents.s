@@ -7,14 +7,28 @@
         |
         | Phase 1: storage and display only. The Bool Operator parameter reads and
         | writes a composite 0..7 value - operator in the low two bits, accent flag
-        | in bit 2 - while the operator byte itself keeps its stock 0..3 range and
-        | the accent flag lives in bit 1 of the euclid-enable byte. Playback is
-        | untouched, so an accent variant behaves exactly like its base operator.
+        | in bit 2 - while the operator byte itself keeps its stock 0..3 range.
+        | Playback is untouched, so an accent variant behaves exactly like its base
+        | operator.
         |
         | Phase 2: playback and bake. trig_fire's grid arm gains an accent OR, and
         | euclid_bake gains an accent body that moves nothing.
+        |
+        | elemod 1.1: the accent flag is a core-ar2 0.2 mod storage field
+        | (mod.json "storage": euclid_accent, scope track, 1 bit), read and written
+        | through core_store_get/core_store_set with (live pattern, track). In
+        | rytm-mods it was bit 1 of the euclid-enable byte (TrackPattern +0x2ca),
+        | which made that byte read 3 and took four more sites to keep stock from
+        | seeing it: a masked getter, a bit-keeping setter, and a pattern save and
+        | load hook that carried it in spare bits of the stored track. All four are
+        | gone. The byte is stock's again and only ever 0 or 1, and core carries the
+        | field with the pattern. With the byte at 1 on an accent track the stock
+        | euclid test would now take the euclid path, so the site at that test stays,
+        | with a new job: it sends an accent track down the grid path.
 
         .include "../include/ar2-1.73.inc"
+        | elemod: live track -> (live pattern, track), for core's track field
+        .include "../shared/live-track.s"
 
         | elemod: rytm-mods' default build params, as its build passed them
         .equ    P_DIAG_GET, 0
@@ -75,13 +89,32 @@ boolop_get_ui:
         move.l  4+4+4(%sp),-(%sp)                 | p
         jsr     storage_ptr
         addq.l  #4,%sp
-        move.l  (%sp)+,%d0
-        move.l  %a0,%d1                           | null test; d1 is scratch
+        bsr.w   accent_get                        | elemod: d0 = the accent field
+        move.l  (%sp)+,%d1                        | the operator
+        tst.l   %d0
         beq.s     1f
-        btst    #1,OFF_EUCLID_ENABLED(%a0)        | accent flag
-        beq.s     1f
-        bset    #2,%d0                            | composite = op | (accent << 2)
-1:      move.l  (%sp)+,%a0
+        bset    #2,%d1                            | composite = op | (accent << 2)
+1:      move.l  %d1,%d0
+        move.l  (%sp)+,%a0
+        rts
+
+        | ------------------------------------------------------------------
+        | elemod: accent_get(%a0 = live track, or 0) -> d0 = the accent field, 0/1
+        |
+        | The live track is what storage_ptr returns. Not a live pattern track:
+        | 0. Clobbers d1/a0/a1, like the C call it makes.
+        | ------------------------------------------------------------------
+        .align  2
+accent_get:
+        bsr.w   track_item                        | a0 = live pattern, d0 = track
+        bmi.s     1f
+        move.l  %d0,-(%sp)                        | index
+        move.l  %a0,-(%sp)                        | item
+        move.l  #euclid_accent,-(%sp)             | field
+        jsr     core_store_get
+        lea     12(%sp),%sp
+        rts
+1:      clr.l   %d0
         rts
 
         | ------------------------------------------------------------------
@@ -90,7 +123,8 @@ boolop_get_ui:
         | Replaces the jsr target in the set-by-id switch arm. Splits the
         | composite back into the two fields. The operator goes through the stock
         | setter so its clamp and its change notification still run; the accent
-        | flag is written straight into bit 1, which no stock code touches.
+        | flag goes to core's field (elemod), and first, so that the notification
+        | the stock setter always raises follows both changes.
         | ------------------------------------------------------------------
         .align  2
         .globl  euclid_accents_boolop_set_ui
@@ -99,24 +133,28 @@ boolop_set_ui:
         move.l  %d2,-(%sp)
         move.l  %a0,-(%sp)
         move.l  8+8(%sp),%d2                      | v
-        move.l  %d2,%d0
+        move.l  8+4(%sp),-(%sp)                   | p
+        jsr     storage_ptr
+        addq.l  #4,%sp
+        bsr.w   track_item                        | elemod: a0 = live pattern, d0 = track
+        bmi.s     1f
+        move.l  %d2,%d1
+        lsr.l   #2,%d1
+        andi.l  #1,%d1                            | accent requested?
+        move.l  %d1,-(%sp)                        | value
+        move.l  %d0,-(%sp)                        | index
+        move.l  %a0,-(%sp)                        | item
+        move.l  #euclid_accent,-(%sp)             | field
+        jsr     core_store_set
+        lea     16(%sp),%sp
+1:      move.l  %d2,%d0
         moveq   #3,%d1
         and.l   %d1,%d0
         move.l  %d0,-(%sp)                        | operator
         move.l  8+4+4(%sp),-(%sp)                 | p
         jsr     euclid_bool_op_set
         addq.l  #8,%sp
-        move.l  8+4(%sp),-(%sp)                   | p
-        jsr     storage_ptr
-        addq.l  #4,%sp
-        move.l  %a0,%d1                           | null test; d1 is scratch
-        beq.s     2f
-        btst    #2,%d2                            | accent requested?
-        beq.s     1f
-        bset    #1,OFF_EUCLID_ENABLED(%a0)
-        bra.s     2f
-1:      bclr    #1,OFF_EUCLID_ENABLED(%a0)
-2:      move.l  (%sp)+,%a0
+        move.l  (%sp)+,%a0
         move.l  (%sp)+,%d2
         rts
 
@@ -159,33 +197,54 @@ lbl_sub_a:      .asciz  "SUB*"
         | trig_fire's grid arm, with the accent OR.
         |
         | Reached by a jmp that replaced `mvzw %a2@(0,%d0:l),%d2` and the `bras`
-        | after it. On arrival a2 is the pattern base, a3 the track offset, d3 the
-        | step and d0 = a3 + step*2. d0 is dead once we leave - the join reloads it
-        | from d2 - but it is saved anyway so nothing here rests on that.
+        | after it. On arrival a2 is the live pattern (LIVE_PAT(p + 1)), a3 the
+        | track offset (917 * track), d3 the step and d0 = a3 + step*2. d0 is dead
+        | once we leave - the join reloads it from d2 - but it is saved anyway so
+        | nothing here rests on that; so are d1/a0/a1, which the core call takes.
         |
-        | An accent track carries raw & 3 == 3, so the euclid test at 0x4009aaca
-        | (masked to bits 0..1 by trig_fire_euclid_masked) sends it down this arm.
+        | elemod: an accent track has euclid on (byte 1) and the accent field set;
+        | trig_fire_euclid_gate sends it down this arm.
         | ------------------------------------------------------------------
         .align  2
         .globl  euclid_accents_trig_fire_accent
 euclid_accents_trig_fire_accent:
 trig_fire_accent:
         mvzw    %a2@(0,%d0:l),%d2                 | displaced: d2 = trigword[step]
-        move.l  %a0,-(%sp)
-        move.l  %d0,-(%sp)
+        lea     -16(%sp),%sp                      | ColdFire movem has no -(An)
+        movem.l %d0-%d1/%a0-%a1,(%sp)
         lea     %a2@(0,%a3:l),%a0                 | a0 = track base
-        move.b  OFF_EUCLID_ENABLED(%a0),%d0
-        and.l   #3,%d0                            | BOTH bits: euclid on AND accent
-        cmp.l   #3,%d0
-        bne.s     1f                                | with euclid off the map is stale
+        btst    #0,OFF_EUCLID_ENABLED(%a0)        | euclid on? with it off the map is stale
+        beq.s     1f
+        bsr.w   accent_field_tf                   | and the accent field set?
+        beq.s     1f
+        lea     %a2@(0,%a3:l),%a0
         lea     OFF_EUCLID_STEP_MAP(%a0),%a0      | 0x2d1 is past an 8-bit displacement
         move.b  %a0@(0,%d3:l),%d0                 | map[step]
         tst.b   %d0
         bmi.s     1f                                | < 0, no euclidean hit here
         bset    #3,%d2                            | TRIG_BIT_ACCENT; the join resets the flags
-1:      move.l  (%sp)+,%d0
-        move.l  (%sp)+,%a0
+1:      movem.l (%sp),%d0-%d1/%a0-%a1
+        lea     16(%sp),%sp
         jmp     trig_fire_flags_join
+
+        | ------------------------------------------------------------------
+        | elemod: accent_field_tf() -> d0 = the accent field, flags from it
+        |
+        | Inside trig_fire, where a2 is the live pattern and a3 = 917 * track.
+        | Clobbers d1/a0/a1, like the C call it makes.
+        | ------------------------------------------------------------------
+        .align  2
+accent_field_tf:
+        move.l  %a3,%d0
+        divu.w  #LIVE_TRK_SIZE,%d0                | a3 < 13 * 917: the quotient fits
+        andi.l  #0xffff,%d0                       | the track
+        move.l  %d0,-(%sp)                        | index
+        move.l  %a2,-(%sp)                        | item
+        move.l  #euclid_accent,-(%sp)             | field
+        jsr     core_store_get
+        lea     12(%sp),%sp
+        tst.l   %d0
+        rts
 
         | ------------------------------------------------------------------
         | euclid_bake gate.
@@ -205,9 +264,8 @@ euclid_bake_gate:
         move.l  8(%sp),-(%sp)                     | p
         jsr     storage_ptr
         addq.l  #4,%sp
-        move.l  %a0,%d1                           | null test; d1 is scratch at entry
-        beq.s     1f
-        btst    #1,OFF_EUCLID_ENABLED(%a0)
+        bsr.w   accent_get                        | elemod; d1/a1 are scratch at entry
+        tst.l   %d0
         beq.s     1f
         move.l  (%sp)+,%a0
         move.l  4(%sp),-(%sp)                     | p
@@ -294,138 +352,34 @@ bake_accents:
         rts
 
         | ------------------------------------------------------------------
-        | euclid_enabled_get / _set, reimplemented.
-        |
-        | Bit 1 of the euclid-enable byte carries the accent flag and bits 2..5 are
-        | free for other mods, so stock's two accessors have to stop trampling them:
-        |
-        |   get  must return raw & 1, or euclid_generate - which tests for exactly
-        |        1 - would stop running on an accent track carrying raw == 3
-        |   set  must preserve bits 1..7, or every turn-off would clear them.
-        |        The toggle handler calls set(p, 0) on EVERY turn-off, FUNC or not.
-        |
-        | Both are small enough to reimplement outright rather than patch in place.
-        | The notify call is replicated exactly: stock puts a pointer to the change
-        | descriptor in a stack local and passes that local's address.
-        | ------------------------------------------------------------------
-        .equ    EUCLID_CHANGE_INFO, 0x401e0898
-
-        .align  2
-        .globl  euclid_accents_euclid_enabled_get_masked
-euclid_accents_euclid_enabled_get_masked:
-euclid_enabled_get_masked:
-        move.l  %a0,-(%sp)
-        move.l  8(%sp),-(%sp)                     | p
-        jsr     storage_ptr
-        addq.l  #4,%sp
-        clr.l   %d0
-        move.l  %a0,%d1                           | null test; d1 is scratch
-        beq.s     1f
-        move.b  OFF_EUCLID_ENABLED(%a0),%d0
-        moveq   #1,%d1
-        and.l   %d1,%d0
-1:      move.l  (%sp)+,%a0
-        rts
-
-        .align  2
-        .globl  euclid_accents_euclid_enabled_set_keep
-euclid_accents_euclid_enabled_set_keep:
-euclid_enabled_set_keep:
-        move.l  %d2,-(%sp)
-        move.l  %a0,-(%sp)
-        move.l  16(%sp),%d2                       | v
-        move.l  12(%sp),-(%sp)                    | p
-        jsr     storage_ptr
-        addq.l  #4,%sp
-        move.l  %a0,%d1                           | null test; d1 is scratch
-        beq.s     3f
-        mvzb    OFF_EUCLID_ENABLED(%a0),%d0
-        bclr    #0,%d0                            | keep accent and the free bits
-        tst.l   %d2
-        ble.s     1f
-        bset    #0,%d0                            | stock clamps anything > 0 to 1
-1:      move.b  %d0,OFF_EUCLID_ENABLED(%a0)
-
-        lea     -4(%sp),%sp                       | the stack local stock uses
-        move.l  #EUCLID_CHANGE_INFO,(%sp)
-        move.l  %sp,%d0
-        move.l  %d0,-(%sp)                        | &local
-        move.l  20(%sp),%a0                       | p
-        move.l  %a0,-(%sp)
-        move.l  (%a0),%a0
-        move.l  VT_NOTIFY(%a0),%a0
-        jsr     (%a0)
-        lea     12(%sp),%sp
-
-3:      move.l  (%sp)+,%a0
-        move.l  (%sp)+,%d2
-        rts
-
-        | ------------------------------------------------------------------
-        | Persistence of the euclid-enable byte's spare bits.
-        |
-        | pattern_track_save packs the euclid-enable byte into storage +0x279 as
-        | (raw << 7) in a single byte, so only bit 0 survives, and
-        | pattern_track_load unpacks bit 7 alone. Bits 2..6 of that storage byte
-        | are ignored by the load and written as zero by the save, so live bits
-        | 1..5 ride there, shifted up by one:
-        |
-        |   live +0x2ca   bit 0 enable | bit 1 accent | bits 2..5 free for mods
-        |   storage +0x279 bit 7 enable | bit 2 accent | bits 3..6   | bits 0..1 operator
-        |
-        | save: reached by a jmp over `mvsb %a2@(714),%d0; lsll #7,%d0`. a2 is the
-        |       live track, d0 the packed byte under construction, d1 the operator.
-        | load: reached by a jmp over `addl %d0,%d0; subxl %d0,%d0; negl %d0`, with
-        |       d0 = storage[+0x279] sign-extended and a3 the storage track. The
-        |       result is stored to live +0x2ca at the resume point.
-        | ------------------------------------------------------------------
-        .equ    OFF_STORAGE_EUCLID, 0x279
-
-        .align  2
-        .globl  euclid_accents_pattern_save_accent
-euclid_accents_pattern_save_accent:
-pattern_save_accent:
-        mvsb    %a2@(714),%d0                     | displaced
-        lsll    #7,%d0                            | displaced
-        move.l  %d3,-(%sp)
-        move.b  OFF_EUCLID_ENABLED(%a2),%d3
-        and.l   #0x3e,%d3                         | live bits 1..5
-        lsl.l   #1,%d3                            | -> storage bits 2..6
-        or.l    %d3,%d0
-        move.l  (%sp)+,%d3
-        jmp     pattern_track_save_euclid_resume
-
-        .align  2
-        .globl  euclid_accents_pattern_load_accent
-euclid_accents_pattern_load_accent:
-pattern_load_accent:
-        addl    %d0,%d0                           | displaced: d0 = bit 7 ? 1 : 0
-        subxl   %d0,%d0                           | displaced
-        negl    %d0                               | displaced
-        move.l  %d1,-(%sp)
-        move.b  OFF_STORAGE_EUCLID(%a3),%d1
-        and.l   #0x7c,%d1                         | storage bits 2..6
-        lsr.l   #1,%d1                            | -> live bits 1..5
-        or.l    %d1,%d0
-        move.l  (%sp)+,%d1
-        jmp     pattern_track_load_euclid_resume
-
-        | ------------------------------------------------------------------
         | trig_fire's euclid test.
         |
-        | Stock takes the euclidean path when the enable byte is exactly 1. Accent
-        | tracks carry 3 and must take the grid path, which that test already
-        | gives. Other mods' bits 2..5 must not change the outcome, so the byte is
-        | masked to bits 0..1 first. Reached by a jmp over `moveb %a0@(714),%d0;
-        | lea %a3@(0,%d7:l:2),%a1`; the eorl/tstb/seq that follow run unchanged.
+        | Stock takes the euclidean path when the enable byte is exactly 1. An
+        | accent track must take the grid path (trig_fire_accent colours the grid's
+        | trigs from the euclid map), so when the byte is 1 and the accent field is
+        | set the byte read is answered as 0. elemod: in rytm-mods the accent was
+        | bit 1 of this byte, which made it 3 and gave the grid path for nothing;
+        | the site masked out other mods' bits 2..5. Reached by a jmp over
+        | `moveb %a0@(714),%d0; lea %a3@(0,%d7:l:2),%a1`, with a0 = a2 + a3 the
+        | track base; the eorl/tstb/seq that follow run unchanged and look at the
+        | low byte of d0 only.
         | ------------------------------------------------------------------
         .align  2
-        .globl  euclid_accents_trig_fire_euclid_masked
-euclid_accents_trig_fire_euclid_masked:
-trig_fire_euclid_masked:
+        .globl  euclid_accents_trig_fire_euclid_gate
+euclid_accents_trig_fire_euclid_gate:
+trig_fire_euclid_gate:
         moveb   %a0@(714),%d0                     | displaced
         lea     %a3@(0,%d7:l:2),%a1               | displaced
-        and.l   #0xffffff03,%d0                   | low byte to bits 0..1; moveb left the rest
+        lea     -16(%sp),%sp
+        movem.l %d0-%d1/%a0-%a1,(%sp)
+        mvzb    %d0,%d1
+        subq.l  #1,%d1
+        bne.s     1f                                | euclid off: nothing to decide
+        bsr.w   accent_field_tf
+        beq.s     1f
+        clr.b   3(%sp)                            | the saved d0's low byte: euclid off
+1:      movem.l (%sp),%d0-%d1/%a0-%a1
+        lea     16(%sp),%sp
         jmp     trig_fire_euclid_flag_resume
 
         | ------------------------------------------------------------------

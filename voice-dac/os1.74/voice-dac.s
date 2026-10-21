@@ -13,10 +13,10 @@
         | stock has off the main bus (ROUTE TO MAIN off) stays out of the sum.
         |
         | Switched at run time by DAC SUM, the last item of the AUDIO ROUTING
-        | menu. OFF is stock's routing and no sum. It is saved with the
-        | project's globals, beside the routing it overrides: stored bytes
-        | +12 (tag) and +13 of projectGlobalsStorage_v2_t, which stock's load
-        | and save never touch; a project without the tag loads as OFF.
+        | menu. OFF is stock's routing and no sum. elemod 1.2: it is kept in
+        | core-ar2's mod storage, the field vd_dac (global scope, one bit per
+        | globals slot), so it is saved with the project's globals as before;
+        | a slot saved without it loads as OFF.
         |
         | Each voice is filtered before the sum, set by its track's DAC FILTER
         | page (page 13, reached by pressing FILTER again while DAC SUM is on):
@@ -28,26 +28,22 @@
         | Q; DEP the filtered share of a dry/filtered mix - 0 dB (none), then
         | 0.25 dB steps of cut to -31.5 dB, then FULL, the plain filter - or for
         | PK a boost to +6 dB. The page draws stock's TYP glyph and FILTER
-        | graph. The values live in the live sound's spare bytes, with no tag:
-        | +0x6d bits 0-2 TYP, +0x6e bits 0-6 FRQ ^ 0x7f, +0x6f bits 0-6
-        | DEP ^ 0x7f, and RES in velocity route 0's amount low byte (the
-        | routes' spare bytes, rte_*), so all zero is TYP OFF, FRQ 127, DEP
-        | FULL, RES 0. The other bits are spare and zero, and any field put
-        | there must read zero as its default. Every live sound gets its bytes
-        | from sound_init_defaults (cleared), sound_load (from the stored
-        | record, or cleared when the load fails) or a whole copy of another
-        | sound. sound_save writes TYP, FRQ, DEP and POL, when not all zero, to
-        | the stored record's spare slots 42 and 43 as (tag + TYP) << 8 + FRQ
-        | and POL << 8 + DEP, and the route bytes to slots 44..47 (sound-storage.md); a tick
-        | in the UI's idle routine copies every track's into hpf_track for the
-        | audio interrupt.
+        | graph. elemod 1.2: the values are kept per sound in core-ar2 0.3's
+        | mod storage, through core_store_get and core_store_set with the live
+        | sound as the item: vd_flt (24 bits) = TYP << 21 + (FRQ ^ 0x7f) << 14
+        | + (DEP ^ 0x7f) << 7 + RES, so zero is TYP OFF, FRQ 127, DEP FULL,
+        | RES 0. Core loads, saves, initialises and protects them, so they
+        | travel with the sound as before. A tick in the UI's idle routine
+        | copies every track's into hpf_track for the audio interrupt, which
+        | never calls core.
         |
         | The page's bottom row is ATK, SUS and POL: a transient shaper after
         | the filters (shp_run, in cave23, skipped outright while no voice
         | track has ATK or SUS set) and the voice's polarity, folded into its
-        | pan gains. ATK and SUS live in velocity routes 1's and 2's spare
-        | bytes, signed, POL in +0x6d bit 3; shp_track holds each track's for
-        | the audio interrupt.
+        | pan gains. They are the sound field vd_shp (15 bits) = (ATK & 0x7f)
+        | << 8 + (SUS & 0x7f) << 1 + POL, ATK and SUS 7-bit two's complement,
+        | so zero is 0, 0, +; shp_track holds each track's for the audio
+        | interrupt.
         |
         | Three detours, and a fourth in the timing build:
         |   route_all     0x401212b6  the route mask store: every voice off main
@@ -66,28 +62,15 @@
         |   hpf_text      0x400a85f8  param_value_text: the popups
         |   flt_glyph     0x400a8584  param_knob_draw: TYP as stock's TYP glyph
         |   flt_graph     0x400d2e42  sound_page_draw: stock's FILTER graph
-        | and for keeping the values:
-        |   hpf_save      0x40008492  sound_save, after its memset: slots 42, 43
-        |   hpf_load      0x4000826a  sound_load, after its clear: the live bytes
-        |   snd_load      0x400081f6  sound_load's entry: the live bytes cleared
-        |                             when the load will fail
-        |   snd_init      0x400122d0  sound_init_defaults: the live bytes cleared
+        | and for the caches the audio interrupt reads:
         |   hpf_refresh   0x400a2aae  the screen's idle tick: hpf_track
-        | and for the routes' spare bytes (rte_*, in cave12):
-        |   rte_rload     0x40008364  sound_load after its routes: slots 44..47
-        |   rte_pushv     0x4011f63c  the sound push, velocity amounts: low byte
-        |   rte_pusha     0x4011f660  and aftertouch amounts: low byte cleared
-        |   rte_get_at    0x40033a90  the aftertouch menu's amount getter: low
-        |                             byte cleared, as its display rounds the word
-        |   rte_set_at    0x40033a1c  its amount setter: low byte kept
-        |   rte_setrte_at 0x4003391e  its whole-route setter: low byte kept
-        |   rte_get_vel   0x400c52ba  and the velocity menu's,
-        |   rte_set_vel   0x400c5246  the same code
-        |   rte_setrte_vel 0x400c5148 at other addresses
+        |   vd_project    ev_project  core's event after a project load or
+        |                             CREATE NEW: dac_on, the caches cleared
         | and from vs_body, by jsr: bq_run (cave11) and shp_run (cave23).
-        | and for keeping DAC SUM with the project:
-        |   dac_load      0x40007660  projectGlobals_t's load, after its version check
-        |   dac_save      0x40007bb0  projectGlobals_t's save, before its last fields
+        | elemod 1.2: the sites that only stored, loaded, cleared or protected
+        | the values - sound_save, sound_load, sound_init_defaults, the
+        | globals' load and save, the sound push and the route menus' amount
+        | words - are gone; core-ar2 0.3 owns those.
         |
         | Addresses and layouts: re/subsystems/compressor-hardware.md.
 
@@ -96,7 +79,6 @@
         | elemod: rytm-mods' default build params, as its build passed them
         .equ    P_BURN, 0
         .equ    P_CTRL_ALL, 1
-        .equ    P_DBG, 0
         .equ    P_DIAL, 1
         .equ    P_K, 11190
         .equ    P_PROF, 0
@@ -204,36 +186,22 @@
         .equ    TYP_PK,         7
         .equ    FRQ_MAX,        127
         .equ    DEP_FULL,       127               | DEP 0 is 0 dB, no filter
-        .equ    OFF_FLT_TYP,    0x6d              | live sound: TYP, FRQ ^ 0x7f, DEP ^ 0x7f
-        .equ    OFF_FLT_FRQ,    0x6e
-        .equ    OFF_FLT_DEP,    0x6f
-        .equ    FLT_TYP_BITS,   0x07              | +0x6d's TYP; the rest spare
-        .equ    FLT_7_BITS,     0x7f              | +0x6e's FRQ, +0x6f's DEP; bit 7 spare
-        .equ    FLT_TAG,        0xb8              | stored: 0xb8..0xbf; else untagged
-        | The routes' spare bytes: each velocity and aftertouch route's amount
-        | is a word stock only ever sets in whole steps (byte << 8), so its low
-        | byte is free. Route i's is at +0x71 + 3i (velocity) and +0x8d + 3i
-        | (aftertouch); stored, the eight are slots 44..47 in that order.
-        .equ    OFF_RTE_VEL,    0x71
-        .equ    OFF_RTE_AT,     0x8d
-        .equ    OFF_FLT_RES,    OFF_RTE_VEL       | RES 0..127, in velocity route 0's
-        .equ    OFF_SHP_ATK,    OFF_RTE_VEL + 3   | ATK, -64..63, in route 1's
-        .equ    OFF_SHP_SUS,    OFF_RTE_VEL + 6   | SUS, -64..63, in route 2's
-        .equ    FLT_POL_BIT,    3                 | +0x6d: POL, the voice inverted
+        .equ    FLT_7_BITS,     0x7f              | an entry's FRQ, DEP and RES
+        | elemod 1.2: core-ar2 0.3's mod storage. The fields' descriptors are
+        | absolute symbols elekloader defines; core_store_get(field, item,
+        | index) and core_store_set(field, item, index, value) clobber
+        | d0-d1/a0-a1 (vd_get, vd_put keep them).
+        .extern core_store_get, core_store_set, vd_flt, vd_shp, vd_dac
+        | the live globals records, as core-ar2's GLOBAL_LIVE: slot k at
+        | GLOBAL_LIVE + 228 k; vd_dac's index is that slot
+        .equ    GLOBAL_LIVE,    0x413192ff
+        .equ    GLOBAL_STRIDE,  228
         .equ    SHP_K_RF,       35494783        | Ef's release, 40 ms
         .equ    SHP_K_AS,       93353822        | Es's attack, 15 ms
         .equ    SHP_K_RS,       9523193        | Es's release, 150 ms
         .equ    SHP_K_RH,       4766887        | Eh's release, 300 ms
         .equ    SHP_GATE,       2147484        | -60 dBFS
-        .equ    OFF_SLOT44,     0x1c + 2 * 44
-        .equ    RTE_ENGINE,     0x8000ea3c        | engine route words, 32 bytes a track
-        .equ    RLOAD_OK,       0x40008378        | sound_load's success exit
-        .equ    RLOAD_RESUME,   0x4000836a        | its aftertouch routes' fallback call
-        .equ    PUSHV_RESUME,   0x4011f6ae
-        .equ    PUSHA_RESUME,   0x4011f6d2
-        .equ    SLOAD_RESUME,   0x400081fe        | sound_load past its prologue
-        .equ    INIT_RESUME,    0x400122d6        | sound_init_defaults past its first clear
-        | All-zero live bytes' values, as a hpf_track entry: TYP << 24 + FRQ << 16
+        | The fields' zero, as a hpf_track entry: TYP << 24 + FRQ << 16
         | + DEP << 8 (| begins a comment here, so the fields are added). FRQ is
         | stock's default, 127.
         .equ    FLT_DEFAULT,    (FRQ_MAX << 16) + (DEP_FULL << 8)
@@ -259,26 +227,16 @@
         .equ    DELTA_CALL,     0x400b693e
         .equ    TEXT_RESUME,    0x400a866c
         .equ    TEXT_CALL,      0x400ff5c2
-        .equ    OFF_SLOT42,     0x1c + 2 * 42     | stored record: spare slots 42
-        .equ    OFF_SLOT43,     0x1c + 2 * 43     | and 43
-        .equ    SLOT43_POL,     8                 | slot 43: POL, above DEP
-        .equ    SAVE_MAP,       0x401c5c7c        | sound_slot_map, the displaced lea
-        .equ    SAVE_RESUME,    0x40008498
-        .equ    LOAD_MAP,       0x401c5d24        | its inverse, the displaced lea
-        .equ    LOAD_RESUME,    0x40008270
         .equ    IDLE_RESUME,    0x400a2b22
-        | DAC SUM in the project's globals (projectGlobalsStorage_v2_t, loaded
-        | by 0x4000763c and saved by 0x40007a5c; stored bytes 12..24 are
-        | touched by neither). ProjectGlobals is the project's member at +236;
-        | its vtable +80, called with (object, 0), is the change notice stock's
-        | routing setters end with.
-        .equ    OFF_DAC_TAG,    12
-        .equ    OFF_DAC_ON,     13
-        .equ    DAC_TAG,        0xd5
+        | DAC SUM, the global field vd_dac. ProjectGlobals is the project's
+        | member at +236; its vtable +52 answers the active live record, and
+        | +80, called with (object, 0), is the change notice stock's routing
+        | setters end with, after which stock saves the globals (and core
+        | vd_dac with them).
         .equ    PROJ_GLOBALS,   236
+        .equ    PROJ_SINGLETON, 0x419f28a8        | project_singleton's project, 0
+                                                  | while it is being built
         .equ    VT_CHANGED,     80
-        .equ    DLOAD_RESUME,   0x40007666
-        .equ    DSAVE_RESUME,   0x40007bb8
 
         .if     P_TIMING
         | tpeak(side): the timing build's headroom counters - the block's
@@ -928,57 +886,72 @@ hpf_cycle:
         | ------------------------------------------------------------------
         | A knob's values as one hpf_track entry: TYP << 24 | FRQ << 16 | DEP
         | << 8 | RES.
-        |   flt_entry(a0 = live sound) -> d0, with RES in the low byte.
-        |                                 Clobbers d0/d1.
+        |   flt_entry(a0 = live sound) -> d0, with RES in the low byte, from
+        |                                 vd_flt. Clobbers d0/d1.
         |   flt_cur() -> d0, the selected track's; FLT_DEFAULT with no sound.
         |                Clobbers d0/d1/a0/a1.
         |   flt_ours(d0 = id) -> Z set for ID_FRQ, ID_RES, ID_TYP and ID_DEP.
         |   flt_shift(d1 = one of those) -> d1 = its field's shift.
-        |   flt_set(d0 = entry): the selected track's sound, its spare bits
-        |                        kept, and its
+        |   flt_set(d0 = entry): the selected track's sound's vd_flt and its
         |                        hpf_track entry, then the change notice stock's
         |                        own sound settings setters send (ENV RESET's,
         |                        0x400bcee4): SoundConfigChangedInfo, kind 1,
         |                        through the track's sound accessor's vtable
         |                        +16. Without it the change is lost at a reboot
         |                        unless the kit is saved. Clobbers d0/d1/a0/a1.
-        |   flt_put7(d0 = 0..127, a1 = +0x6e or +0x6f): the field, stored as
-        |                        d0 ^ 0x7f, bit 7 kept. Clobbers d0/d1.
+        |   flt_pack(d0 = entry) -> d0 = its vd_flt value. Clobbers d1.
         | ------------------------------------------------------------------
         .align  2
 flt_entry:
-        mvz.b   OFF_FLT_TYP(%a0),%d0
-        and.l   #FLT_TYP_BITS,%d0
-        lsl.l   #8,%d0
-        mvz.b   OFF_FLT_FRQ(%a0),%d1
+        move.l  %d2,-(%sp)
+        move.l  #vd_flt,%d0
+        bsr.w   vd_get                            | TYP, FRQ ^ 0x7f, DEP ^ 0x7f, RES
+        eor.l   #(FLT_7_BITS << 14) + (FLT_7_BITS << 7),%d0
+        move.l  %d0,%d2
+        and.l   #FLT_7_BITS,%d2                   | RES
+        lsr.l   #7,%d0
+        move.l  %d0,%d1
         and.l   #FLT_7_BITS,%d1
-        eor.l   #FLT_7_BITS,%d1
-        or.l    %d1,%d0
-        lsl.l   #8,%d0
-        mvz.b   OFF_FLT_DEP(%a0),%d1
+        lsl.l   #8,%d1
+        or.l    %d1,%d2                           | DEP << 8
+        lsr.l   #7,%d0
+        move.l  %d0,%d1
         and.l   #FLT_7_BITS,%d1
-        eor.l   #FLT_7_BITS,%d1
-        or.l    %d1,%d0
-        lsl.l   #8,%d0
-        mvz.b   OFF_FLT_RES(%a0),%d1
-        and.l   #FLT_7_BITS,%d1
-        or.l    %d1,%d0
+        swap    %d1
+        or.l    %d1,%d2                           | FRQ << 16
+        lsr.l   #7,%d0
+        and.l   #TYP_PK,%d0
+        moveq   #24,%d1
+        lsl.l   %d1,%d0
+        or.l    %d2,%d0                           | TYP << 24
+        move.l  (%sp)+,%d2
         rts
 
         .align  2
-flt_put7:
-        and.l   #FLT_7_BITS,%d0
-        eor.l   #FLT_7_BITS,%d0
-        mvz.b   (%a1),%d1
-        and.l   #0x80,%d1
-        or.l    %d1,%d0
-        move.b  %d0,(%a1)
+flt_pack:
+        move.l  %d2,-(%sp)
+        move.l  %d0,%d1
+        and.l   #FLT_7_BITS,%d1                   | RES
+        move.l  %d1,%d2
+        move.l  %d0,%d1
+        lsr.l   #1,%d1
+        and.l   #FLT_7_BITS << 7,%d1              | DEP << 7
+        or.l    %d1,%d2
+        move.l  %d0,%d1
+        lsr.l   #2,%d1
+        and.l   #FLT_7_BITS << 14,%d1             | FRQ << 14
+        or.l    %d1,%d2
+        lsr.l   #3,%d0
+        and.l   #TYP_PK << 21,%d0                 | TYP << 21
+        or.l    %d2,%d0
+        eor.l   #(FLT_7_BITS << 14) + (FLT_7_BITS << 7),%d0
+        move.l  (%sp)+,%d2
         rts
 
         .align  2
 flt_cur:
         jsr     ca_sound
-        bne.s   flt_entry
+        bne.w   flt_entry
         move.l  #FLT_DEFAULT,%d0
         rts
 
@@ -1046,26 +1019,10 @@ flt_set:
         beq.s   9f
         move.l  %d0,%a0                           | the live sound
         move.l  (%sp),%d0
-        swap    %d0                               | TYP << 8 | FRQ
-        lea     OFF_FLT_FRQ(%a0),%a1
-        bsr.w   flt_put7
-        move.l  (%sp),%d0
-        lsr.l   #8,%d0                            | DEP
-        lea     OFF_FLT_DEP(%a0),%a1
-        bsr.w   flt_put7
-        mvz.b   OFF_FLT_RES(%a0),%d1
-        and.l   #0x80,%d1
-        move.l  (%sp),%d0
-        and.l   #FLT_7_BITS,%d0                   | RES
-        or.l    %d1,%d0
-        move.b  %d0,OFF_FLT_RES(%a0)
-        move.l  (%sp),%d0
-        moveq   #24,%d1
-        lsr.l   %d1,%d0                           | TYP
-        mvz.b   OFF_FLT_TYP(%a0),%d1
-        and.l   #0xff-FLT_TYP_BITS,%d1
-        or.l    %d1,%d0
-        move.b  %d0,OFF_FLT_TYP(%a0)
+        bsr.w   flt_pack
+        move.l  %d0,%d1
+        move.l  #vd_flt,%d0
+        bsr.w   vd_put                            | the sound's vd_flt
         lea     -8(%sp),%sp                       | SoundConfigChangedInfo, kind 1
         move.l  #SOUND_CONFIG_CHANGED,(%sp)
         move.b  #1,4(%sp)
@@ -1082,122 +1039,39 @@ flt_set:
 
 
         | ------------------------------------------------------------------
-        | sound_save, after its memset of the stored parameter block, over
-        | `lea 0x401c59cc,%a0`: a2 the stored record, a3 the live sound. Slots
-        | 42 (+0x70) and 43 (+0x72), which stock zeroes and never reads, carry
-        | (FLT_TAG + TYP) << 8 + FRQ and POL << 8 + DEP, or stay 0 when the live bytes are
-        | all zero, so an untouched sound saves as stock would save it. Slots
-        | 44..47 carry the routes' spare bytes (rte_save). d0/d1 and a0/a1 are
-        | set again straight after.
+        | A sound field through core-ar2's mod storage, item the live sound,
+        | index 0.
+        |   vd_get(d0 = field, a0 = live sound) -> d0 = its value.
+        |   vd_put(d0 = field, d1 = value, a0 = live sound).
+        | Both keep every register but d0; neither runs in the audio
+        | interrupt.
         | ------------------------------------------------------------------
         .align  2
-        .globl  voice_dac_hpf_save
-voice_dac_hpf_save:
-hpf_save:
-        move.l  %a3,%a0
-        move.l  %a2,%a1
-        jsr     rte_save
-        mvz.b   OFF_FLT_TYP(%a3),%d0
-        mvz.w   OFF_FLT_FRQ(%a3),%d1
-        or.l    %d1,%d0
-        beq.s   1f                                | all zero: the defaults
-        move.l  %a3,%a0
-        bsr.w   flt_entry
-        move.l  %d0,%d1
-        lsr.l   #8,%d1
-        and.l   #0xff,%d1
-        btst    #FLT_POL_BIT,OFF_FLT_TYP(%a3)
-        beq.s   2f
-        bset    #SLOT43_POL,%d1
-2:      move.w  %d1,OFF_SLOT43(%a2)               | DEP, POL in bit 8
-        swap    %d0                               | TYP << 8 | FRQ
-        add.l   #FLT_TAG << 8,%d0
-        move.w  %d0,OFF_SLOT42(%a2)
-1:      lea     SAVE_MAP,%a0                      | displaced
-        jmp     SAVE_RESUME
+vd_get:
+        lea     -12(%sp),%sp
+        movem.l %d1/%a0-%a1,(%sp)
+        clr.l   -(%sp)                            | index, unused for a sound
+        move.l  %a0,-(%sp)                        | item: the live sound
+        move.l  %d0,-(%sp)                        | the field
+        jsr     core_store_get
+        lea     12(%sp),%sp
+        movem.l (%sp),%d1/%a0-%a1
+        lea     12(%sp),%sp
+        rts
 
-        | ------------------------------------------------------------------
-        | sound_load, after it clears the live parameter array, over `lea
-        | 0x401c5a74,%a0`: a2 the live sound, a3 the stored record. The live
-        | bytes, POL included, from slots 42 and 43 when slot 42 holds the tag,
-        | or all zero, so
-        | a sound saved without them - or by stock, which zeroes the slots -
-        | reads the defaults rather than whatever the object held. d0/d1 and
-        | a0/a1 are set again straight after.
-        | ------------------------------------------------------------------
         .align  2
-        .globl  voice_dac_hpf_load
-voice_dac_hpf_load:
-hpf_load:
-        mvz.w   OFF_SLOT42(%a3),%d0
-        move.l  %d0,%d1
-        lsr.l   #8,%d1
-        sub.l   #FLT_TAG,%d1
-        cmp.l   #TYP_PK,%d1
-        bhi.s   1f                                | untagged
-        move.b  %d1,OFF_FLT_TYP(%a2)
-        lea     OFF_FLT_FRQ(%a2),%a1
-        clr.w   (%a1)
-        bsr.w   flt_put7                          | FRQ, the low byte
-        mvz.w   OFF_SLOT43(%a3),%d0
-        lea     OFF_FLT_DEP(%a2),%a1
-        bsr.w   flt_put7
-        mvz.w   OFF_SLOT43(%a3),%d0
-        btst    #SLOT43_POL,%d0
-        beq.s   2f
-        bset    #FLT_POL_BIT,OFF_FLT_TYP(%a2)     | POL
-        bra.s   2f
-1:      clr.b   OFF_FLT_TYP(%a2)
-        clr.w   OFF_FLT_FRQ(%a2)
-2:      lea     LOAD_MAP,%a0                      | displaced
-        jmp     LOAD_RESUME
-
-        | ------------------------------------------------------------------
-        | sound_load's entry, over `lea %sp@(-24),%sp; moveml
-        | %d2-%d3/%a2-%a5,%sp@`: 4(%sp) the live sound, 8(%sp) the stored
-        | record. Stock returns false, writing nothing, when the record is
-        | null or not version 4, and one caller (0x4018cb98) uses the object
-        | anyway; the live bytes and the routes' spare bytes are cleared first
-        | in that case, so a fresh object reads the defaults. d0/d1 and a0/a1
-        | are free at a call.
-        | ------------------------------------------------------------------
-        .align  2
-        .globl  voice_dac_snd_load
-voice_dac_snd_load:
-snd_load:
-        move.l  4(%sp),%d0
-        beq.s   9f                                | no sound: nothing to clear
-        move.l  %d0,%a0
-        move.l  8(%sp),%d0
-        beq.s   1f                                | no record: the load fails
-        move.l  %d0,%a1
-        moveq   #4,%d0
-        cmp.l   4(%a1),%d0
-        beq.s   9f                                | version 4: hpf_load sets them
-1:      clr.b   OFF_FLT_TYP(%a0)
-        clr.w   OFF_FLT_FRQ(%a0)
-        jsr     rte_clear
-9:      lea     -24(%sp),%sp                      | displaced
-        movem.l %d2-%d3/%a2-%a5,(%sp)             | displaced
-        jmp     SLOAD_RESUME
-
-        | ------------------------------------------------------------------
-        | sound_init_defaults, past its null test, over `moveal %a2,%a0;
-        | moveal %a2,%a3; clrl %a0@+`: a2 the sound. Stock's defaults never
-        | reach +0x6d..+0x6f, so a new sound would hold whatever the allocator
-        | left there; they are cleared, the defaults. A sound reset through
-        | this (0x400bd756) loses its DAC FILTER values with the rest.
-        | ------------------------------------------------------------------
-        .align  2
-        .globl  voice_dac_snd_init
-voice_dac_snd_init:
-snd_init:
-        clr.b   OFF_FLT_TYP(%a2)
-        clr.w   OFF_FLT_FRQ(%a2)
-        move.l  %a2,%a0                           | displaced
-        move.l  %a2,%a3                           | displaced
-        clr.l   (%a0)+                            | displaced
-        jmp     INIT_RESUME
+vd_put:
+        lea     -12(%sp),%sp
+        movem.l %d1/%a0-%a1,(%sp)
+        move.l  %d1,-(%sp)                        | value
+        clr.l   -(%sp)                            | index
+        move.l  %a0,-(%sp)                        | item
+        move.l  %d0,-(%sp)                        | the field
+        jsr     core_store_set
+        lea     16(%sp),%sp
+        movem.l (%sp),%d1/%a0-%a1
+        lea     12(%sp),%sp
+        rts
 
         | ------------------------------------------------------------------
         | The screen's idle tick (0x400a2aaa, about 20 a second, UI context),
@@ -1206,7 +1080,7 @@ snd_init:
         | entry, from the sound its active kit holds, into hpf_track, so the audio
         | interrupt follows kit loads, pattern changes and sound loads within a
         | tick without looking up a sound itself. Then DAC SUM, from the
-        | active globals record's entry, so it follows a project load.
+        | active globals slot's vd_dac, so it follows a project load.
         | ------------------------------------------------------------------
         .align  2
         .globl  voice_dac_hpf_refresh
@@ -1220,11 +1094,7 @@ hpf_refresh:
 1:      move.l  %d2,%d0
         jsr     shared_sound_of
         beq.s   3f                                | no sound: off
-        .if     P_DBG
-        bsr.w   dbg_check
-        jsr     rte_probe
-        .endif
-        bsr.w   flt_entry
+        bsr.w   flt_entry                         | keeps a0
         move.l  %d0,%d3
         jsr     shp_entry
         bra.s   4f
@@ -1246,124 +1116,80 @@ hpf_refresh:
         and.l   #0xffff0000,%d0
         move.l  %d0,shp_any
         jsr     flt_knobs
-        bsr.w   dac_active                        | DAC SUM: the active record's
-        bsr.w   dac_find
-        tst.l   %d0
-        bmi.s   5f
-        lea     dac_rec,%a1
-        mvz.b   (%a1,%d0.l),%d0
-        move.l  %d0,dac_on
-5:      movem.l (%sp),%d2-%d3
+        bsr.w   dac_refresh                       | DAC SUM: the active slot's
+        movem.l (%sp),%d2-%d3
         lea     8(%sp),%sp
         jmp     IDLE_RESUME                       | a2 kept: calls clobber d0/d1/a0/a1
 
         | ------------------------------------------------------------------
-        | projectGlobals_t's load (0x4000763c), after its version check, over
-        | `mvsb %a2@(4),%d1; moveq #1,%d2`, both re-emitted: a2 the stored
-        | record, a3 the live one. The boot loop loads four (0x4000ce1c), so
-        | the value goes to that live record's entry in dac_rec - stored +13
-        | under the tag at +12, or OFF - and hpf_refresh picks the active
-        | record's. A single flag, set by every load, took the last record's
-        | and lost the active one's (hardware, 2026-09-28); an untouched record
-        | can hold leftovers there (the fourth read 00 01), which the tag keeps
-        | out. d0 is written again before it is read.
-        | ------------------------------------------------------------------
-        .align  2
-        .globl  voice_dac_dac_load
-voice_dac_dac_load:
-dac_load:
-        lea     -8(%sp),%sp
-        movem.l %a0-%a1,(%sp)
-        move.l  %a3,%a0
-        bsr.w   dac_slot                          | d0 = this live record's entry
-        moveq   #0,%d1
-        mvz.b   OFF_DAC_TAG(%a2),%d2              | d2 is set again after
-        cmp.l   #DAC_TAG,%d2
-        bne.s   1f
-        tst.b   OFF_DAC_ON(%a2)
-        sne     %d1
-        and.l   #1,%d1                            | 1 or 0
-1:      lea     dac_rec,%a1
-        move.b  %d1,(%a1,%d0.l)
-        .if     P_DBG
-        addq.l  #1,dbg_loads
-        lea     dbg_tags,%a1
-        mvz.b   OFF_DAC_TAG(%a2),%d1
-        move.b  %d1,(%a1,%d0.l)                   | the tag each record's load found
-        .endif
-        movem.l (%sp),%a0-%a1
-        lea     8(%sp),%sp
-        mvs.b   4(%a2),%d1                        | displaced
-        moveq   #1,%d2                            | displaced
-        jmp     DLOAD_RESUME
-
-        | ------------------------------------------------------------------
-        | projectGlobals_t's save (0x40007a5c), over `moveq #2,%d0` and the
-        | first four bytes of `moveb %a3@(211),%a2@(70)`, both re-emitted: a2
-        | the stored record. The tag at +12 and DAC SUM at +13. d1 is not read
-        | again.
-        | ------------------------------------------------------------------
-        .align  2
-        .globl  voice_dac_dac_save
-voice_dac_dac_save:
-dac_save:
-        .if     P_DBG
-        addq.l  #1,dbg_saves
-        .endif
-        lea     -8(%sp),%sp
-        movem.l %a0-%a1,(%sp)
-        move.l  #DAC_TAG,%d1
-        move.b  %d1,OFF_DAC_TAG(%a2)
-        move.l  dac_on,%d1                        | a record never loaded: DAC SUM
-        move.l  %a3,%a0
-        bsr.w   dac_find
-        tst.l   %d0
-        bmi.s   1f
-        lea     dac_rec,%a1
-        mvz.b   (%a1,%d0.l),%d1                   | this record's
-1:      move.b  %d1,OFF_DAC_ON(%a2)
-        movem.l (%sp),%a0-%a1
-        lea     8(%sp),%sp
-        moveq   #2,%d0                            | displaced
-        move.b  211(%a3),70(%a2)                  | displaced
-        jmp     DSAVE_RESUME
-
-        | ------------------------------------------------------------------
-        | The four globals records' DAC SUM, keyed by live record: dac_live
-        | holds each record's address as its load saw it, dac_rec its value.
-        |   dac_find(a0 = live record) -> d0 = its entry, or -1
-        |   dac_slot(a0 = live record) -> d0 = its entry, taking the next one
-        |                                 round when it has none
+        | DAC SUM in the global field vd_dac, index the globals slot.
+        |   dac_gslot(a0 = live globals record) -> d0 = its slot 0..3, or -1.
+        |                   Clobbers d0/d1.
         |   dac_active() -> a0 = the active live record (ProjectGlobals'
-        |                   vtable +52, as stock's routing getters ask)
-        | dac_find and dac_slot clobber d0/a1, dac_active d0/d1/a0/a1.
+        |                   vtable +52, as stock's routing getters ask).
+        |                   Clobbers d0/d1/a0/a1.
+        |   dac_refresh(): dac_on from the active slot's vd_dac; kept as it is
+        |                   when the record is none of the four. Clobbers
+        |                   d0/d1/a0/a1.
+        |   vd_project(how, dropped): core's ev_project, after a project
+        |                   load (at boot too) or CREATE NEW, the stored
+        |                   project and its mod data in place. dac_on from the
+        |                   new globals, and the caches the audio interrupt
+        |                   reads cleared - every filter and the shaper off -
+        |                   until the next idle tick fills them from the new
+        |                   sounds, so the old project's settings do not play
+        |                   meanwhile. At boot the project is loaded while
+        |                   project_singleton is still building it, and a
+        |                   call to it then builds a second, empty one, so
+        |                   dac_on is left to the first idle tick until
+        |                   the singleton is set. C's convention: keeps
+        |                   d2-d7/a2-a6.
         | ------------------------------------------------------------------
         .align  2
-dac_find:
-        lea     dac_live,%a1
-        moveq   #0,%d0
-1:      cmpa.l  (%a1)+,%a0
-        beq.s   2f
-        addq.l  #1,%d0
-        cmp.l   #4,%d0
-        bne.s   1b
-        moveq   #-1,%d0
-2:      rts
+dac_gslot:
+        move.l  %a0,%d0
+        sub.l   #GLOBAL_LIVE,%d0
+        bcs.s   8f                                | below slot 0
+        moveq   #0,%d1
+1:      tst.l   %d0
+        beq.s   9f
+        sub.l   #GLOBAL_STRIDE,%d0
+        bcs.s   8f                                | between two slots
+        addq.l  #1,%d1
+        cmp.l   #4,%d1
+        blt.s   1b
+8:      moveq   #-1,%d0
+        rts
+9:      move.l  %d1,%d0
+        rts
 
         .align  2
-dac_slot:
-        bsr.s   dac_find
+dac_refresh:
+        bsr.s   dac_active
+        bsr.s   dac_gslot
         tst.l   %d0
-        bpl.s   9f
-        move.l  dac_next,%d0
-        lea     dac_live,%a1
-        move.l  %a0,(%a1,%d0.l*4)
-        move.l  %d0,-(%sp)
-        addq.l  #1,%d0
-        and.l   #3,%d0
-        move.l  %d0,dac_next
-        move.l  (%sp)+,%d0
+        bmi.s   9f
+        move.l  %d0,-(%sp)                        | index: the slot
+        clr.l   -(%sp)                            | item, unused
+        move.l  #vd_dac,-(%sp)
+        jsr     core_store_get
+        lea     12(%sp),%sp
+        move.l  %d0,dac_on
 9:      rts
+
+        .align  2
+        .globl  voice_dac_vd_project
+voice_dac_vd_project:
+vd_project:
+        lea     hpf_track,%a0                     | hpf_track, shp_track, shp_any
+        moveq   #VOICE_TRACKS * 2,%d0
+1:      clr.l   (%a0)+
+        subq.l  #1,%d0
+        bne.s   1b
+        clr.l   shp_any
+        tst.l   PROJ_SINGLETON
+        bne.s   dac_refresh
+        rts                                       | at boot: the idle tick's
 
         .align  2
 dac_active:
@@ -1377,86 +1203,6 @@ dac_active:
         addq.l  #4,%sp
         move.l  %d0,%a0
         rts
-
-        .if     P_DBG
-        | ------------------------------------------------------------------
-        | The debug build: DAC SUM's value reads "R<m>m<n>": dbg_rte in three
-        | hex digits and dbg_marks in one, F for 15 and more; then E when
-        | dbg_eng is set and B when dbg_bad is not 0. Short, to clear the label
-        | it is right-aligned against.
-        | Clobbers d0/d1/a0/a1.
-        | ------------------------------------------------------------------
-        .align  2
-dbg_fmt:
-        lea     dbg_txt,%a1
-        move.b  #'R',(%a1)+
-        move.l  dbg_rte,%d1
-        lsr.l   #8,%d1
-        bsr.w   dbg_nib
-        move.l  dbg_rte,%d0
-        bsr.w   dbg_hex
-        move.b  #'m',(%a1)+
-        move.l  dbg_marks,%d1
-        moveq   #15,%d0
-        cmp.l   %d0,%d1
-        bls.s   3f
-        move.l  %d0,%d1
-3:      bsr.w   dbg_nib
-        tst.l   dbg_eng
-        beq.s   1f
-        move.b  #'E',(%a1)+
-1:      tst.l   dbg_bad
-        beq.s   2f
-        move.b  #'B',(%a1)+
-2:      clr.b   (%a1)
-        rts
-        | dbg_check(a0 = track d2's live sound): sets bit d2 of dbg_bad, and
-        | keeps it, when the sound's bytes hold what nothing writes - a spare
-        | bit: a sound that reached a track without sound_init_defaults,
-        | sound_load or a copy. Clobbers d0/d1.
-dbg_check:
-        mvz.b   OFF_FLT_TYP(%a0),%d0
-        and.l   #0xff-FLT_TYP_BITS-(1 << FLT_POL_BIT),%d0
-        bne.s   1f                                | a spare bit
-        mvz.b   OFF_FLT_FRQ(%a0),%d0
-        mvz.b   OFF_FLT_DEP(%a0),%d1
-        or.l    %d1,%d0
-        and.l   #0x80,%d0
-        beq.s   9f                                | bit 7 of neither
-1:      move.l  dbg_bad,%d0
-        bset    %d2,%d0
-        move.l  %d0,dbg_bad
-9:      rts
-        | dbg_dec(d0, a1): 0..99, two digits, wrapping
-dbg_dec:
-        divu.w  #100,%d0
-        swap    %d0
-        and.l   #0xffff,%d0
-        divu.w  #10,%d0
-        moveq   #'0',%d1
-        add.l   %d0,%d1
-        move.b  %d1,(%a1)+
-        swap    %d0
-        moveq   #'0',%d1
-        add.l   %d0,%d1
-        move.b  %d1,(%a1)+
-        rts
-        | dbg_hex(d0 = a byte, a1): two hex digits
-dbg_hex:
-        move.l  %d0,%d1
-        lsr.l   #4,%d1
-        bsr.s   dbg_nib
-        move.l  %d0,%d1
-        | dbg_nib(d1, a1): its low four bits, one hex digit
-dbg_nib:
-        and.l   #15,%d1
-        cmp.l   #10,%d1
-        bcs.s   2f
-        addq.l  #7,%d1
-2:      add.l   #'0',%d1
-        move.b  %d1,(%a1)+
-        rts
-        .endif
 
 txt_page:
         .asciz  "DAC FILTER"
@@ -1641,12 +1387,7 @@ dac_draw:
         tst.l   dac_on
         beq.s   1f
         move.l  #txt_on,%d2
-1:
-        .if     P_DBG
-        bsr.w   dbg_fmt
-        move.l  #dbg_txt,%d2
-        .endif
-        move.l  %d4,-(%sp)
+1:      move.l  %d4,-(%sp)
         move.l  %d2,-(%sp)
         move.l  %d3,-(%sp)
         jsr     std_string_from_cstr
@@ -1671,10 +1412,11 @@ dac_draw:
         lea     32(%sp),%sp
         rts
 
-        | dac_change(functor, -, delta): up turns DAC SUM on, down off, marks
-        | the project's globals changed, then invalidates the view the functor
-        | holds. The value is not a stock
-        | setting, so no setter's notification redraws it.
+        | dac_change(functor, -, delta): up turns DAC SUM on, down off, in
+        | dac_on and the active globals slot's vd_dac, marks the project's
+        | globals changed, then invalidates the view the functor holds. The
+        | value is not a stock setting, so no setter's notification redraws
+        | it.
         .align  2
 dac_change:
         move.l  12(%sp),%d0
@@ -1686,12 +1428,15 @@ dac_change:
 3:      move.l  %d0,dac_on
         move.l  %d0,-(%sp)
         bsr.w   dac_active
-        bsr.w   dac_find
+        bsr.w   dac_gslot
         tst.l   %d0
         bmi.s   4f
-        lea     dac_rec,%a1
-        move.l  (%sp),%d1
-        move.b  %d1,(%a1,%d0.l)                   | the active record's entry
+        move.l  (%sp),-(%sp)                      | value
+        move.l  %d0,-(%sp)                        | index: the slot
+        clr.l   -(%sp)                            | item, unused
+        move.l  #vd_dac,-(%sp)
+        jsr     core_store_set                    | the active slot's
+        lea     16(%sp),%sp
 4:      addq.l  #4,%sp
         jsr     project_singleton                 | the project's globals changed,
         add.l   #PROJ_GLOBALS,%d0                 | so they are saved with it, as
@@ -1739,14 +1484,10 @@ txt_off:
         .asciz  "OFF"
 
         | Written at run time, as 0010's data in cave6 is: 0 until the project
-        | loads, then as its globals were saved.
+        | loads, then the active globals slot's vd_dac (dac_refresh).
         .align  2
 dac_on:
         .long   0
-        | The globals records' DAC SUM (dac_find, dac_slot).
-dac_live: .long 0, 0, 0, 0
-dac_next: .long 0
-dac_rec: .byte  0, 0, 0, 0
         | Each voice track's filter entry, TYP << 24 | FRQ << 16 | DEP << 8, as
         | flt_set and hpf_refresh leave it. 0, off, at power-on.
         .balign 4
@@ -1769,15 +1510,6 @@ flt_key:
         .rept   8
         .long   -1
         .endr
-        .if     P_DBG
-dbg_loads: .long 0
-dbg_saves: .long 0
-dbg_tags: .byte 0, 0, 0, 0
-dbg_txt: .space 20
-        .align  2
-dbg_bad: .long  0                                 | per voice track, a bit
-        .align  2
-        .endif
 hpf_state:
         .rept   8
         .long   0, 0                              | x1, y1, per slot
@@ -3014,15 +2746,14 @@ shp_snap_id:                                      | and the knob it is for
         | ------------------------------------------------------------------
         | The transient shaper's and POL's knobs, ATK, SUS and POL. Their values
         | live outside the entry word hpf_track holds: ATK and SUS signed,
-        | -64..63, in velocity routes 1's and 2's spare bytes (the dials 0..127,
-        | 64 the centre), POL in +0x6d bit 3. All 0 is no shaping, not
-        | inverted.
+        | -64..63, and POL, in the sound field vd_shp (the dials 0..127, 64
+        | the centre). All 0 is no shaping, not inverted.
         |   shp_ours(d0 = id) -> Z set for ID_ATK, ID_SUS and ID_POL.
         |   shp_entry(a0 = live sound) -> d0 = ATK << 24 | SUS << 16 | POL << 8,
-        |                                 ATK and SUS clamped. Clobbers d1.
+        |                                 from vd_shp. Clobbers d1.
         |   shp_value(d0 = id, a0 = live sound) -> d0, the field: ATK and SUS
-        |                                 signed and clamped, POL 0 or 1.
-        |                                 Keeps d1 = id.
+        |                                 signed, POL 0 or 1. Leaves d1 = id;
+        |                                 keeps a0/a1.
         |   shp_get(d0 = id) -> d0, the selected track's dial value, 8.8.
         |   shp_delta(d0 = id, d1 = delta, 8.8, d2 = FUNC held): ATK and SUS
         |                                 by whole steps, clamped, or with FUNC
@@ -3047,51 +2778,51 @@ shp_ours:
         cmp.l   #ID_POL,%d0
 9:      rts
 
-        | shp_clamp(d0): -64..63, as ATK and SUS read, so a stray byte (such as
-        | the route-byte probe's marker, 90, in kits saved while it ran)
-        | reads as the nearest value the knob can set. Keeps the rest.
-        .align  2
-shp_clamp:
-        cmp.l   #63,%d0
-        ble.s   1f
-        moveq   #63,%d0
-1:      cmp.l   #-64,%d0
-        bge.s   2f
-        moveq   #-64,%d0
-2:      rts
-
         .align  2
 shp_entry:
-        mvs.b   OFF_SHP_SUS(%a0),%d0
-        bsr.s   shp_clamp
+        move.l  %d2,-(%sp)
+        move.l  #vd_shp,%d0
+        bsr.w   vd_get                            | ATK << 8, SUS << 1, POL
+        move.l  %d0,%d2
+        lsr.l   #8,%d0
+        and.l   #0x7f,%d0                         | ATK, 7-bit two's complement,
+        eor.l   #0x40,%d0                         | as a signed byte
+        sub.l   #0x40,%d0
         and.l   #0xff,%d0
-        move.l  %d0,%d1
-        mvs.b   OFF_SHP_ATK(%a0),%d0
-        bsr.s   shp_clamp
         lsl.l   #8,%d0
+        move.l  %d2,%d1
+        lsr.l   #1,%d1
+        and.l   #0x7f,%d1                         | SUS, likewise
+        eor.l   #0x40,%d1
+        sub.l   #0x40,%d1
+        and.l   #0xff,%d1
         or.l    %d1,%d0
         lsl.l   #8,%d0
-        mvz.b   OFF_FLT_TYP(%a0),%d1
-        lsr.l   #FLT_POL_BIT,%d1
-        and.l   #1,%d1
+        move.l  %d2,%d1
+        and.l   #1,%d1                            | POL
         or.l    %d1,%d0
         lsl.l   #8,%d0
+        move.l  (%sp)+,%d2
         rts
 
         .align  2
 shp_value:
-        move.l  %d0,%d1
+        move.l  %d0,-(%sp)
+        move.l  #vd_shp,%d0
+        bsr.w   vd_get                            | keeps d1/a0/a1
+        move.l  (%sp)+,%d1                        | the id
         cmp.l   #ID_ATK,%d1
         bne.s   1f
-        mvs.b   OFF_SHP_ATK(%a0),%d0
-        bra.s   shp_clamp
+        lsr.l   #8,%d0
+        bra.s   3f
 1:      cmp.l   #ID_SUS,%d1
         bne.s   2f
-        mvs.b   OFF_SHP_SUS(%a0),%d0
-        bra.s   shp_clamp
-2:      mvz.b   OFF_FLT_TYP(%a0),%d0
-        lsr.l   #FLT_POL_BIT,%d0
-        and.l   #1,%d0
+        lsr.l   #1,%d0
+3:      and.l   #0x7f,%d0                         | 7-bit two's complement
+        eor.l   #0x40,%d0
+        sub.l   #0x40,%d0
+        rts
+2:      and.l   #1,%d0                            | POL
         rts
 
         .align  2
@@ -3223,23 +2954,31 @@ shp_set:
         jsr     (%a0)
         addq.l  #4,%sp
         tst.l   %d0
-        beq.s   9f
+        beq.w   9f
         move.l  %d0,%a0                           | the live sound
+        move.l  #vd_shp,%d0
+        bsr.w   vd_get                            | ATK << 8, SUS << 1, POL
+        move.l  %d5,%d1
+        and.l   #0x7f,%d1
         cmp.l   #ID_ATK,%d4
         bne.s   1f
-        move.b  %d5,OFF_SHP_ATK(%a0)
+        and.l   #0x00ff,%d0
+        lsl.l   #8,%d1
         bra.s   3f
 1:      cmp.l   #ID_SUS,%d4
         bne.s   2f
-        move.b  %d5,OFF_SHP_SUS(%a0)
+        and.l   #0x7f01,%d0
+        add.l   %d1,%d1
         bra.s   3f
-2:      mvz.b   OFF_FLT_TYP(%a0),%d0
-        bclr    #FLT_POL_BIT,%d0
+2:      and.l   #0x7ffe,%d0                       | POL
+        moveq   #0,%d1
         tst.l   %d5
-        beq.s   4f
-        bset    #FLT_POL_BIT,%d0
-4:      move.b  %d0,OFF_FLT_TYP(%a0)
-3:      bsr.w   shp_entry
+        beq.s   3f
+        moveq   #1,%d1
+3:      or.l    %d0,%d1
+        move.l  #vd_shp,%d0
+        bsr.w   vd_put
+        bsr.w   shp_entry
         lea     shp_track,%a1
         move.l  %d0,(%a1,%d3.l*4)
         lea     -8(%sp),%sp                       | SoundConfigChangedInfo, kind 1
@@ -3305,209 +3044,6 @@ shp_text:
 flt_stock_typ:
         .byte   7, 0, 1, 2, 3, 4, 5, 6
         .align  2
-
-        | ------------------------------------------------------------------
-        | The routes' spare bytes. Each velocity and aftertouch route's amount
-        | word holds the amount in its high byte; stock writes the low byte
-        | only as 0 (sound_load's byte << 8, the defaults, the route menu's
-        | whole steps) and saves only the high byte, but the engine, the menu's
-        | display and its setter all take the whole word. So the low byte
-        | carries data here only with: the sound push clearing it on the way
-        | to the engine (rte_pushv, rte_pusha), the menus' getters clearing it
-        | (rte_get_*) and their setters keeping it (rte_set_*, rte_setrte_*),
-        | and the eight saved in slots 44..47 (rte_save, rte_rload) - route
-        | i's velocity byte at +0x74 + i, its aftertouch byte at +0x78 + i, so
-        | a sound saved without them loads them as 0.
-        |   rte_save(a0 = live sound, a1 = stored record): slots 44..47.
-        |   rte_load(a0 = live sound, a1 = stored record): the live bytes.
-        |   rte_clear(a0 = live sound): the live bytes 0.
-        | None touches a register but those named.
-        | ------------------------------------------------------------------
-        .align  2
-rte_save:
-        .irp    i,0,1,2,3
-        move.b  OFF_RTE_VEL+3*\i(%a0),OFF_SLOT44+\i(%a1)
-        move.b  OFF_RTE_AT+3*\i(%a0),OFF_SLOT44+4+\i(%a1)
-        .endr
-        rts
-
-        .align  2
-rte_load:
-        .irp    i,0,1,2,3
-        move.b  OFF_SLOT44+\i(%a1),OFF_RTE_VEL+3*\i(%a0)
-        move.b  OFF_SLOT44+4+\i(%a1),OFF_RTE_AT+3*\i(%a0)
-        .endr
-        rts
-
-        .align  2
-rte_clear:
-        .irp    i,0,1,2,3
-        clr.b   OFF_RTE_VEL+3*\i(%a0)
-        clr.b   OFF_RTE_AT+3*\i(%a0)
-        .endr
-        rts
-
-        | sound_load once both route sets are loaded, over `tstb %d2; bnes
-        | 0x40008378; movel %d3,%sp@-`, reimplemented: d2 is whether every
-        | aftertouch route loaded. The frame holds six registers, so 28(%sp)
-        | is the live sound and 32(%sp) the stored record. The spare bytes go
-        | in after the routes, which stock writes whole. d0/d1 and a0/a1 are
-        | not read again.
-        .align  2
-        .globl  voice_dac_rte_rload
-voice_dac_rte_rload:
-rte_rload:
-        move.l  28(%sp),%a0
-        move.l  32(%sp),%a1
-        bsr.s   rte_load
-        tst.b   %d2
-        beq.s   1f
-        jmp     RLOAD_OK
-1:      move.l  %d3,-(%sp)
-        jmp     RLOAD_RESUME                      | the fallback, which clears them
-
-        | The sound push's route loops, each over its amount word's copy,
-        | reimplemented to clear the low byte: velocity `movew
-        | %a1@(112),%a0@(1216)` with d3 free (set again two instructions on),
-        | aftertouch `movew %a2@(140),%a0@` with d2 free (likewise), its next
-        | instruction re-emitted.
-        .align  2
-        .globl  voice_dac_rte_pushv
-voice_dac_rte_pushv:
-rte_pushv:
-        move.w  112(%a1),%d3
-        and.l   #0xffffff00,%d3
-        move.w  %d3,1216(%a0)
-        jmp     PUSHV_RESUME
-
-        .align  2
-        .globl  voice_dac_rte_pusha
-voice_dac_rte_pusha:
-rte_pusha:
-        move.w  140(%a2),%d2
-        and.l   #0xffffff00,%d2
-        move.w  %d2,(%a0)
-        move.l  %d0,%a1                           | displaced
-        jmp     PUSHA_RESUME
-
-        | The route menus' models, ModSetupView's, are two instances of one
-        | template over a sound's modTarget_t[4]: SoundModConf (aftertouch,
-        | 0x40033xxx) and Velocity (0x400c5xxx), the same code at different
-        | addresses. Each gets the same three stubs, by rte_model:
-        |   rte_get<s>    getAmount, over `lea %a3@(0,%a3:l:2),%a0; addql
-        |                 #4,%sp`, re-emitted, and the read and branch after,
-        |                 reimplemented: the word with its low byte cleared, as
-        |                 the menu's display rounds the whole word.
-        |   rte_set<s>    setAmount, over the clamped value's store and the
-        |                 load after, both re-emitted: d1 the value, a0 + d0
-        |                 the route; the route's low byte goes back into the
-        |                 value first. d2 is the caller's.
-        |   rte_setrte<s> setRoute, which writes a whole route from a copy
-        |                 (amount word at a1, destination after): over the
-        |                 amount's store and the lea after, re-emitted; only
-        |                 the amount's high byte is stored, so the route keeps
-        |                 its low byte whatever the copy came from.
-        | ControlInputParam (0x40137xxx) is a third instance, over the
-        | project's control inputs rather than a sound, and is left alone.
-        .macro  rte_model s, get_resume, set_resume, setrte_resume
-        .align  2
-        .globl  voice_dac_rte_get\s
-voice_dac_rte_get\s:
-rte_get\s:
-        lea     (0,%a3,%a3.l*2),%a0               | displaced
-        addq.l  #4,%sp                            | displaced
-        mvs.w   (%a0,%d0.l),%d0
-        and.l   #0xffffff00,%d0
-        jmp     \get_resume
-
-        .align  2
-        .globl  voice_dac_rte_set\s
-voice_dac_rte_set\s:
-rte_set\s:
-        move.l  %d2,-(%sp)
-        mvz.b   1(%a0,%d0.l),%d2
-        and.l   #0xffffff00,%d1
-        or.l    %d2,%d1
-        move.l  (%sp)+,%d2
-        move.w  %d1,(%a0,%d0.l)                   | displaced
-        move.l  #SOUND_CONFIG_CHANGED,%d0         | displaced
-        jmp     \set_resume
-
-        .align  2
-        .globl  voice_dac_rte_setrte\s
-voice_dac_rte_setrte\s:
-rte_setrte\s:
-        move.b  (%a1),(%a0,%d0.l)
-        lea     19(%fp),%a1                       | displaced
-        jmp     \setrte_resume
-        .endm
-
-        rte_model _at, 0x40033a9e, 0x40033a26, 0x40033926
-        rte_model _vel, 0x400c5334, 0x400c52bc, 0x400c51bc
-
-        .if     P_DBG
-        | rte_probe(a0 = track d2's live sound): the debug build's test of the
-        | routes' spare bytes not yet in use - all but velocity routes 0..2's,
-        | RES, ATK and SUS: velocity route 3's and the four aftertouch routes'.
-        | A sound whose five are all 0 gets the marker RTE_MARK in each; one
-        | holding some markers and some zeros, or any other value, has
-        | something writing them that is not ours, and sets bit d2 of
-        | dbg_rte, kept; its markers are put back, so a sound saved in that
-        | state flags once a session rather than hiding a new write.
-        | dbg_marks counts the sounds marked: a kit saved with its markers and
-        | loaded again should add none. Any engine route word for the track
-        | with a low byte set means the push let one through, and sets
-        | dbg_eng. Clobbers d0/d1/d3/a1.
-        .equ    RTE_MARK,       0x5a
-        .align  2
-rte_probe:
-        moveq   #0,%d3                            | markers seen
-        moveq   #0,%d1                            | anything else seen
-        .irp    off,OFF_RTE_VEL+9,OFF_RTE_AT,OFF_RTE_AT+3,OFF_RTE_AT+6,OFF_RTE_AT+9
-        mvz.b   \off(%a0),%d0
-        beq.s   2f
-        cmp.l   #RTE_MARK,%d0
-        bne.s   1f
-        addq.l  #1,%d3
-        bra.s   2f
-1:      moveq   #1,%d1
-2:
-        .endr
-        tst.l   %d1
-        bne.s   2f
-        tst.l   %d3
-        beq.s   1f
-        moveq   #5,%d0
-        cmp.l   %d0,%d3
-        beq.s   3f                                | all five: as left
-        bra.s   2f
-1:      addq.l  #1,dbg_marks
-        bra.s   6f
-2:      move.l  dbg_rte,%d0
-        bset    %d2,%d0
-        move.l  %d0,dbg_rte
-6:      .irp    off,OFF_RTE_VEL+9,OFF_RTE_AT,OFF_RTE_AT+3,OFF_RTE_AT+6,OFF_RTE_AT+9
-        move.b  #RTE_MARK,\off(%a0)
-        .endr
-3:      move.l  %d2,%d0
-        lsl.l   #5,%d0
-        add.l   #RTE_ENGINE+1,%d0                 | route 0's low byte
-        move.l  %d0,%a1
-        moveq   #7,%d0
-4:      tst.b   (%a1)
-        bne.s   5f
-        addq.l  #4,%a1
-        subq.l  #1,%d0
-        bpl.s   4b
-        rts
-5:      moveq   #1,%d0
-        move.l  %d0,dbg_eng
-        rts
-        .align  2
-dbg_rte: .long  0                                 | per voice track, a bit
-dbg_eng: .long  0
-dbg_marks: .long 0
-        .endif
 
         | ------------------------------------------------------------------
         | The filter's tables.

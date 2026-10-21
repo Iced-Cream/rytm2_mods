@@ -5,6 +5,9 @@
 link with [elekloader](https://github.com/irpina/elekloader)'s `core-ar2` and with each other,
 instead of being patched into code caves at fixed addresses.
 
+From v1.2, euclid-accents, velocity-humanise and voice-dac keep their settings in core-ar2 0.3's
+mod storage and build for OS 1.74 only; lfo-rnd uses core-ar2's storage too.
+
 No firmware is included: no OS files, sections, dumps or built `.syx`/`.elemod` files. The
 mods name firmware routines by address only (`include/ar2-1.73.inc`, `include/ar2-1.74.inc`), and their `mod.json`
 sites carry the stock instruction bytes they replace, as elekloader's own mods do.
@@ -45,9 +48,11 @@ slice-loop and env-reset-amp rename their entry label instead). A site covers wh
 displaced, exactly as in rytm-mods. Two mods may never patch the same bytes.
 
 0000-shared is not a mod here: its ~234 bytes are assembled into each mod that calls it
-(velocity-humanise, lfo-rnd and voice-dac), so every mod stands alone. velocity-humanise does
-need euclid-accents (its amount lives in bits only euclid-accents saves), and says so in
-`requires`; the linker refuses it alone.
+(velocity-humanise, lfo-rnd and voice-dac), so every mod stands alone. euclid-accents,
+velocity-humanise, lfo-rnd and voice-dac keep their settings in core-ar2's mod storage
+(`storage` in their `mod.json`), not in the OS's saved records: euclid-accents 1.1,
+velocity-humanise 1.1 and voice-dac 1.2 need core-ar2 0.3, which is OS 1.74 only, and lfo-rnd
+1.1 needs 0.2 or later. velocity-humanise no longer needs euclid-accents.
 
 The gate chain: euclid-accents, velocity-humanise, lfo-rnd, voice-dac and ctrl-all detour
 consecutive instructions of param_apply_delta (0x400378a6..0x400378c2) and euclid-accents,
@@ -80,18 +85,19 @@ reach only the selected track on 1.74.
 
 You need:
 
-- an [elekloader](https://github.com/irpina/elekloader) checkout at `main` (Analog Rytm MKII
-  support and `core-ar2` arrived in irpina/elekloader#89) and the Python 3 it asks for;
+- an [elekloader](https://github.com/irpina/elekloader) checkout at `main` from
+  irpina/elekloader#147 on (core-ar2 0.3) and the Python 3 it asks for;
 - ColdFire binutils on `PATH` (`m68k-linux-gnu-as` and `-ld`; on Debian or Ubuntu,
   `apt install binutils-m68k-linux-gnu`);
-- your own copy of Elektron's stock Analog Rytm MKII OS 1.73 or 1.74 `.syx`. It is never part
-  of this repository or of anything built from it.
+- your own copy of Elektron's stock Analog Rytm MKII OS 1.74 `.syx`. It is never part
+  of this repository or of anything built from it. (On OS 1.73, elekloader builds core-ar2 0.2,
+  which takes the seven mods without storage and lfo-rnd; the other three need 0.3.)
 
 ```bash
 EL=path/to/elekloader                        # the elekloader checkout
 R2=path/to/rytm2_mods                        # this repository
-STOCK=path/to/Analog-Rytm_MKII_OS1.74.syx    # your stock OS file (1.73 or 1.74)
-OS=-os1.74                                   # with a 1.73 file: OS=
+STOCK=path/to/Analog-Rytm_MKII_OS1.74.syx    # your stock OS file
+OS=-os1.74
 cd "$EL"
 python3 -m elekloader.sdk.build mods/core-ar2 --stock "$STOCK"
 MODS="filter-hz ctrl-all env-reset-amp slice-loop euclid-accents velocity-humanise lfo-rnd
@@ -102,12 +108,14 @@ for m in $MODS; do
   V=$(python3 -c "import json; print(json.load(open('$R2/$m/mod.json'))['version'])")
   ARGS="$ARGS --mod $R2/$m/out/$m-$V$OS.elemod"
 done
-python3 -m elekloader.patch --stock "$STOCK" --mod mods/core-ar2/out/core-0.1$OS.elemod $ARGS \
-    --out rytm-mods.syx --version R2AL
+python3 -m elekloader.patch --stock "$STOCK" --mod mods/core-ar2/out/core-0.3.elemod $ARGS \
+    --out rytm-mods.syx --version R2AL --lockfile rytm-mods.lock.json
 ```
 
-Leave out any mod you don't want from `MODS`, but keep euclid-accents whenever
-velocity-humanise is in: elekloader refuses velocity-humanise without it. `elekloader.patch`
+Leave out any mod you don't want from `MODS`. Keep `rytm-mods.lock.json` and pass it again
+for every later build: it says where each mod's settings live in your projects, kits and
+sounds, so a build that adds or drops a mod still reads them. (A lost lockfile can be taken back
+out of the last build with `--lockfile-from rytm-mods.syx`.) `elekloader.patch`
 checks that the selected mods combine before it writes anything. `--version` is the
 four characters the unit shows as its OS version. The result is your own firmware file:
 keep it, and the `out/` build folders, out of git and out of any upload.
@@ -121,13 +129,13 @@ keep it, and the `out/` build folders, out of git and out of any upload.
 | 0012-slice-loop | `slice-loop/` | hardware-verified | matches label by label; **confirmed on a unit** |
 | 0014-ctrl-all | `ctrl-all/` | hardware-verified | 1.2, MrScruff's SYNTH knob fix (9831bdf): matches label by label, **confirmed on a unit** on OS 1.74; 1.0 and 1.1 **confirmed on a unit** |
 | 0015-env-reset-amp | `env-reset-amp/` | hardware-verified | bit probe left out; matches label by label; **confirmed on a unit** |
-| 0002-euclid-accents | `euclid-accents/` | hardware-verified | matches label by label; **confirmed on a unit** |
-| 0003-velocity-humanise | `velocity-humanise/` | built (MANUAL: verified) | needs euclid-accents; matches label by label; **confirmed on a unit** |
-| 0004-lfo-rnd | `lfo-rnd/` | built (MANUAL: verified) | matches label by label; **confirmed on a unit** |
+| 0002-euclid-accents | `euclid-accents/` | hardware-verified | 1.1, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 matches label by label, **confirmed on a unit** |
+| 0003-velocity-humanise | `velocity-humanise/` | built (MANUAL: verified) | 1.1, settings in core-ar2 0.3's storage, stands alone: **confirmed on a unit** on OS 1.74; 1.0 matches label by label, **confirmed on a unit** |
+| 0004-lfo-rnd | `lfo-rnd/` | built (MANUAL: verified) | 1.1, settings in core-ar2's storage: **confirmed on a unit** on OS 1.74 with core 0.3; 1.0 matches label by label, **confirmed on a unit** |
 | 0006-comp-preview | `comp-preview/` | hardware-verified | matches label by label; **confirmed on a unit** |
 | 0009-main-rms | `main-rms/` | built (MANUAL: display checked on the device) | matches label by label; **confirmed on a unit** |
 | 0010-kit-ab | `kit-ab/` | hardware-verified | matches label by label; **confirmed on a unit** |
-| 0013-voice-dac | `voice-dac/` | hardware-verified | default build only (no timing, prof, burn or dbg); 1.1, MrScruff's update (76ae299): matches label by label but for three names where sections meet; 1.0 **confirmed on a unit** |
+| 0013-voice-dac | `voice-dac/` | hardware-verified | default build only (no timing, prof, burn or dbg); 1.1, MrScruff's update (76ae299): matches label by label but for three names where sections meet; 1.2, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 **confirmed on a unit** |
 
 Every mod on rytm-mods-src main is now ported. "Matches label by label": `tools/verify_port.py`
 re-assembles rytm-mods' own code, checks it equals rytm-mods-src's default build ("T2"), then

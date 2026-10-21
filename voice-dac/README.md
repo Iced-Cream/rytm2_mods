@@ -11,37 +11,71 @@ and POL are set the same on every track (the type the selected track reaches, th
 FUNC + TRK + turn on ATK or SUS moves each track to its own next stop of -64, 0 and +63. It works
 whether ctrl-all is in the build or not.
 
+## 1.2: the settings in core-ar2 0.3's mod storage
+
+Needs core-ar2 0.3 (`"resources": {"core": "0.3"}`). What is kept and how it behaves is as in 1.1:
+DAC FILTER's values are per sound (they travel with it: kit save and reload, the power-fail save,
+a pattern change to another kit, the sound pool, copy and paste; a sound reset sets the defaults), and
+DAC SUM is per global slot. Only where they are kept changed:
+
+| field | scope | bits | value (zero = the default) |
+|---|---|---|---|
+| `vd_flt` | sound | 24 | TYP << 21 \| (FRQ ^ 0x7f) << 14 \| (DEP ^ 0x7f) << 7 \| RES: TYP OFF, FRQ 127, DEP FULL, RES 0 |
+| `vd_shp` | sound | 15 | (ATK & 0x7f) << 8 \| (SUS & 0x7f) << 1 \| POL; ATK and SUS 7-bit two's complement: 0, 0, + |
+| `vd_dac` | global | 1 | DAC SUM, index = the global slot (the active live record, 0x413192ff + 228 x slot): OFF |
+
+Why: 1.1 kept its values in bytes core-ar2 0.2/0.3 now owns (the live sound's +0x6d..+0x6f, the
+velocity routes' amount low bytes and the stored record's spare slots 42..47) and hooked core's own
+sound_load site, so the two could not be built together, and lfo-rnd 1.1's field shares those bytes.
+Through core the 39 sound bits sit beside lfo-rnd's 16 (55 of core 0.3's 56; a build with both was
+checked to allocate them together).
+
+- **Dropped sites (15):** the globals' load and save (0x40007660, 0x40007bb0), sound_load's entry,
+  its mid-body load and its route load (0x400081f6, 0x4000826a, 0x40008364), sound_save
+  (0x40008492), sound_init_defaults (0x400122d0), the sound push (0x4011f63c, 0x4011f660) and the
+  aftertouch and velocity menus' getAmount, setAmount and setRoute (0x40033a90, 0x40033a1c,
+  0x4003391e, 0x400c52ba, 0x400c5246, 0x400c5148). Core owns the save, load, init and the route
+  hooks; nothing of voice-dac reads or writes a sound's or a globals record's bytes any more.
+- **Code:** every read and write goes through `core_store_get` / `core_store_set` with the live
+  sound as the item (`flt_entry`, `flt_set`, `shp_entry`, `shp_value`, `shp_set`, helpers `vd_get`
+  and `vd_put`, which keep d1/a0/a1 so the callers' register contracts hold). DAC SUM reads and
+  writes `vd_dac` for the active slot (`dac_refresh`, `dac_change`). The audio interrupt still reads
+  only the caches (`hpf_track`, `shp_track`, `shp_any`, `dac_on`); the idle tick refills them as
+  before, an edit updates its track at once, and a new `ev_project` handler clears them after a
+  project load or CREATE NEW (so the old project's filters do not play for up to a tick) and reads
+  DAC SUM again - except at boot, when project_singleton is still building the project (calling it
+  then builds a second, empty one), so the first idle tick does it, as in 1.1.
+- **Fixed:** 1.1 wrote its tag and DAC SUM into stored globals +12/+13, which are stock's TRACK 1
+  and TRACK 2 MIDI CHANNEL: TRACK 1 reloaded as its default and TRACK 2 as 0 or 1. 1.2 leaves them
+  alone.
+- **Old settings load as defaults.** Sounds, kits and projects saved by voice-dac 1.0/1.1 or
+  rytm-mods 0013 carry their values in the old places, which core does not read (its layout ID does
+  not match): DAC FILTER reads TYP OFF etc. and DAC SUM OFF until set again. The TRACK 1/2 MIDI
+  channels those builds overwrote stay as loaded until set again.
+- **SysEx:** a global slot received as SysEx keeps no mod data (core's limit: the dump has no room
+  for core's layout ID), so it loads DAC SUM OFF; 1.1's tag at +12 travelled with it.
+- **VELOCITY MOD reset:** core keeps the route bytes' fields when the menu resets the velocity routes;
+  in 1.1 that reset cleared RES, ATK and SUS (they sat in velocity routes 0..2's low bytes).
+- The P_DBG diagnostic build (route-byte probe, tag counters) is gone with the storage it checked.
+
 ## Sites
 
-49 sites, the claims rytm-mods' registry makes for its default build
-(`registry/allocations.toml`, owner `0013-voice-dac`); the timing, prof, burn and dbg builds' extra claims are left out:
+34 sites (1.1 had 49), from the claims rytm-mods' registry makes for its default build
+(`registry/allocations.toml`, owner `0013-voice-dac`), less the 15 that only stored, loaded, cleared or
+protected the values (1.2, below); the timing, prof, burn and dbg builds' extra claims are left out.
+Also a handler on core-ar2's `ev_project`, `voice_dac_vd_project`.
 
 | addr | op | |
 |---|---|---|
-| 0x40007660 | jmp | `jmp voice_dac_dac_load` |
-| 0x40007bb0 | jmp | `jmp voice_dac_dac_save` |
-| 0x400081f6 | jmp | `jmp voice_dac_snd_load` |
-| 0x4000826a | jmp | `jmp voice_dac_hpf_load` |
-| 0x40008364 | jmp | `jmp voice_dac_rte_rload` |
-| 0x40008492 | jmp | `jmp voice_dac_hpf_save` |
-| 0x400122d0 | jmp | `jmp voice_dac_snd_init` |
-| 0x4003391e | jmp | `jmp voice_dac_rte_setrte_at` |
-| 0x40033a1c | jmp | `jmp voice_dac_rte_set_at` |
-| 0x40033a90 | jmp | `jmp voice_dac_rte_get_at` |
 | 0x400378bc | jmp | `jmp voice_dac_hpf_delta` |
 | 0x4003846a | jmp | `jmp voice_dac_hpf_get` |
 | 0x4003ab86 | jmp | `jmp voice_dac_hpf_cycle` |
 | 0x400a2aae | jmp | `jmp voice_dac_hpf_refresh` |
 | 0x400a8584 | jmp | `jmp voice_dac_flt_glyph` |
 | 0x400a85f8 | jmp | `jmp voice_dac_hpf_text` |
-| 0x400c5148 | jmp | `jmp voice_dac_rte_setrte_vel` |
-| 0x400c5246 | jmp | `jmp voice_dac_rte_set_vel` |
-| 0x400c52ba | jmp | `jmp voice_dac_rte_get_vel` |
 | 0x400d2e42 | jmp | `jmp voice_dac_flt_graph` |
 | 0x400d901c | jmp | `jmp voice_dac_dac_menu_add` |
 | 0x400ff592 | jmp | `jmp voice_dac_hpf_page_info` |
-| 0x4011f63c | jmp | `jmp voice_dac_rte_pushv` |
-| 0x4011f660 | jmp | `jmp voice_dac_rte_pusha` |
 | 0x4011fde2 | jmp | `jmp voice_dac_vs_alt` |
 | 0x401212b6 | jmp | `jmp voice_dac_route_all` |
 | 0x40121364 | jmp | `jmp voice_dac_vs_main` |
@@ -75,6 +109,8 @@ table is a `ptr` site.
 
 ## Changes from rytm-mods
 
+- 1.2 keeps the settings in core-ar2's mod storage (above), so its storage code differs from
+  rytm-mods 0013's; the rest is unchanged.
 - Generated by `tools/port_mod.py`. The code is unchanged; each label a site names gets a
   `.globl` alias carrying the mod id on the line before it, and the stub keeps using its own
   local labels.
@@ -90,8 +126,57 @@ table is a `ptr` site.
 2. TYP LP2 and FRQ down while a pattern plays: the voice darkens. ATK/SUS shape the hits.
 3. DAC SUM OFF: FILTER twice stays on the stock page.
 4. Listen for glitches on a busy pattern: the filter runs in the audio interrupt, now from the DDR mods area.
+5. (1.2) Set different DAC FILTER values on two tracks (TRK + a pad selects one). SAVE KIT (YES +
+   PLAYMODE), change them, KIT > RELOAD: the saved values come back on each track. Change one without
+   saving the kit and power-cycle: it is kept. DAC SUM ON, power-cycle: still ON.
+6. (1.2) GLOBAL SLOT 2: DAC SUM ON there, back to slot 1: OFF; slot 2 again: ON.
+7. (1.2) MIDI CONFIG > CHANNELS: TRACK 1 and TRACK 2 keep their channels across a power cycle with DAC
+   SUM on (1.1 overwrote them).
+8. (1.2) With lfo-rnd 1.1 in the build: LFO RND and DAC FILTER settings on one sound both survive a
+   kit save and reload and a power cycle. The VELOCITY MOD menu reads as on stock.
 
 ## Results so far
+
+1.2 builds for OS 1.74 only: it needs core-ar2 0.3, which has no 1.73 port. Its 1.73 source stays
+the porting master, as for every mod here (`tools/port_os.py`).
+
+Hardware, Analog Rytm MKII OS 1.74, 2026-10-20, core-ar2 0.3 with all eleven mods: test steps 1 to 8
+pass. DAC FILTER values are kept through kit save and reload, a power-cycle without a kit save, the
++Drive sound library, and a kit sent and received by SysEx and by Overbridge. The VELOCITY and
+AFTERTOUCH menus behave as on stock with voice-dac's values in the route bytes.
+
+1.2 (core-ar2 0.3 storage), 2026-10-20: `.run` 10864 B, 34 sites, 36 relocations, imports
+`core_store_get`, `core_store_set`, `vd_flt`, `vd_shp`, `vd_dac`; lint OK with core-ar2 0.3 on 1.74 (and
+on 1.73 before core 0.3 dropped 1.73), also together with lfo-rnd 1.1 (core 0.3 > lfo-rnd 1.1 > voice-dac 1.2; the lockfile puts
+lfo_rnd_cfg at sound bits 0..15, vd_flt at 16..39, vd_shp at 40..54: 55 of 56); with core 0.2 lint
+refuses it (needs 0.3). In rytm-emu (dtboot/dtpeek), each on 1.73 and 1.74, with and without lfo-rnd
+1.1:
+
+- boots to the main screen as stock does; DAC SUM ON in AUDIO ROUTING sets the active slot's
+  `vd_dac` (core's global record, then the stored slot's +0x4b) and `dac_on`; stored globals
+  +12..+24 stay stock's (00 01 02 ..); a second global slot keeps its own value and switching slots
+  follows it;
+- FILTER twice opens DAC FILTER; edits on BD and SD with different values land in each sound's
+  fields and in `hpf_track`/`shp_track`; 90 screens of that flow (menu, page, edits, TRK + pad) are
+  pixel-identical to voice-dac 1.1 with core-ar2 0.1, and with lfo-rnd to 1.1 + lfo-rnd 1.0 with
+  core 0.1; the sound fields hold the same values 1.1 held in its bytes;
+- SAVE KIT, edits (FRQ, POL), KIT > RELOAD: the saved values come back on both tracks (frames
+  identical to 1.1); an unsaved edit then survives a power-off (power-fail save) and cold boot,
+  as does DAC SUM ON, and the caches are refilled after the boot;
+- with lfo-rnd: lfo_rnd_cfg and voice-dac's fields on one sound are both kept through kit save and
+  reload and a power cycle;
+- VELOCITY MOD menu (open, four amount edits, LEFT/RIGHT): 18 screens identical to stock, also on
+  a sound whose route low bytes hold voice-dac's fields (edits change the high bytes as stock does;
+  the low bytes are kept);
+- a card saved by 1.1 (values set, kit saved, power-off) cold-boots in 1.2 with every value at its
+  default and DAC SUM OFF;
+- 1.73 and 1.74 gave identical screens in every scenario.
+
+Not checked: audio (the emulator's voices cannot be heard; the audio path's code is unchanged and
+reads the same caches), hardware, SysEx and Overbridge transfers, the sound pool, copy and paste, a
+pattern change to another kit, project load and CREATE NEW (`ev_project` ran at every boot, where it
+only clears the caches; its other branch, which reads DAC SUM inside a later load, has not run),
+the VELOCITY MOD reset, and CPU cost of the core calls in the idle tick (25 calls a tick).
 
 1.1 (MrScruff's update): `.run` 11424 B, 49 sites, 24 relocations; `tools/verify_port.py` against
 rytm-mods-src 76ae299's default build: the re-assembly equals its caves, and 110 of 113 labels match;

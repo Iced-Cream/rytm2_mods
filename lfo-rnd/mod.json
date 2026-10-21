@@ -1,11 +1,11 @@
 {
  "id": "lfo-rnd",
- "version": "1.0",
+ "version": "1.1",
  "title": "LFO RND page",
  "category": "Sound",
  "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
  "license": "GPL-2.0-only",
- "description": "A second LFO page, LFO RND, reached by pressing the LFO page key again: two random modifiers per sound, each a destination (DS1/DS2, one of 16, chosen from stock's LFO DST list) and a depth (DP1/DP2, 0..64 in 16 steps). On every note trig each modifier draws a random offset for its destination, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound. Port of rytm-mods 0004-lfo-rnd.",
+ "description": "A second LFO page, LFO RND, reached by pressing the LFO page key again: two random modifiers per sound, each a destination (DS1/DS2, one of 16, chosen from stock's LFO DST list) and a depth (DP1/DP2, 0..64 in 16 steps). On every note trig each modifier draws a random offset for its destination, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound through core-ar2 0.2's mod storage (one 16-bit sound field), so the sound's stock bytes stay stock; sounds saved by lfo-rnd 1.0 keep their settings. Port of rytm-mods 0004-lfo-rnd.",
  "device": "analog-rytm-mk2",
  "os": "1.73",
  "sources": [
@@ -242,6 +242,16 @@
    "target": "lfo_rnd_str_r2dep"
   }
  ],
+ "storage": [
+  {
+   "sym": "lfo_rnd_cfg",
+   "scope": "sound",
+   "bits": 16
+  }
+ ],
+ "resources": {
+  "core": "0.2"
+ },
  "requires": [
   "core"
  ],
