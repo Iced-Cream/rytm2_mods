@@ -5,7 +5,7 @@
  "category": "Sound",
  "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
  "license": "GPL-2.0-only",
- "description": "A second LFO page, LFO RND, reached by pressing the LFO page key again: two random modifiers per sound, each a destination (DS1/DS2, one of 16, chosen from stock's LFO DST list) and a depth (DP1/DP2, 0..64 in 16 steps). On every note trig each modifier draws a random offset for its destination, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound through core-ar2 0.2's mod storage (one 16-bit sound field), so the sound's stock bytes stay stock; sounds saved by lfo-rnd 1.0 keep their settings. Port of rytm-mods 0004-lfo-rnd. From 1.2 the page goes through core-ar2 0.4's page tables (needs core 0.4, OS 1.74 only).",
+ "description": "A second LFO page, LFO RND, reached by pressing the LFO page key again: two random modifiers per sound, each a destination (DS1/DS2, one of 16, chosen from stock's LFO DST list) and a depth (DP1/DP2, 0..64 in 16 steps). On every note trig each modifier draws a random offset for its destination, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound through core-ar2 0.2's mod storage (one 16-bit sound field), so the sound's stock bytes stay stock; sounds saved by lfo-rnd 1.0 keep their settings. Port of rytm-mods 0004-lfo-rnd. From 1.2 the page goes through core-ar2 0.4's page tables and page-key lists (needs core 0.4, OS 1.74 only).",
  "device": "analog-rytm-mk2",
  "os": "1.73",
  "sources": [
@@ -71,19 +71,6 @@
    "stock": "4eb94009e790",
    "op": "jmp",
    "target": "lfo_rnd_audio_gate"
-  },
-  {
-   "addr": "0x400cb02a",
-   "stock": "7201",
-   "op": "bytes",
-   "new": "7202",
-   "kind": "code"
-  },
-  {
-   "addr": "0x400cb02e",
-   "stock": "203c401e1b14",
-   "op": "keep2",
-   "target": "lfo_rnd_lfo_pages"
   },
   {
    "addr": "0x401bf950",
@@ -298,19 +285,6 @@
      "target": "lfo_rnd_audio_gate"
     },
     {
-     "addr": "0x400cb096",
-     "stock": "7201",
-     "op": "bytes",
-     "new": "7202",
-     "kind": "code"
-    },
-    {
-     "addr": "0x400cb09a",
-     "stock": "203c401e1dc4",
-     "op": "keep2",
-     "target": "lfo_rnd_lfo_pages"
-    },
-    {
      "addr": "0x401bfc00",
      "stock": "ffffffff",
      "op": "bytes",
@@ -468,6 +442,19 @@
      0,
      "abs32",
      "sym:lfo_rnd_params",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_view_pages",
+   "order": 20,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:lfo_rnd_view_page",
      0
     ]
    ]

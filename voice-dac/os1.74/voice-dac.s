@@ -844,11 +844,10 @@ voice_dac_p5:   .long   ID_FRQ, ID_FRQ, vd_param_get, vd_param_delta, vd_param_t
 voice_dac_p7:   .long   ID_ATK, ID_ATK, vd_param_get, vd_param_delta, vd_param_text
 voice_dac_p11:  .long   ID_TYP, ID_SUS, vd_param_get, vd_param_delta, vd_param_text
 voice_dac_p457: .long   ID_POL, ID_POL, vd_param_get, vd_param_delta, vd_param_text
-        | The FILTER view's page vector, FILTER and then DAC FILTER.
-        .globl  voice_dac_filter_pages
-voice_dac_filter_pages:
-filter_pages:
-        .long   PAGE_FILTER, PAGE_HPF
+        | core_view_pages: DAC FILTER behind FILTER.
+        .globl  voice_dac_view_page
+voice_dac_view_page:
+        .long   2, PAGE_HPF                       | CORE_VIEW_FILTER
 
         | ------------------------------------------------------------------
         | The page key's cycle, `movel %a2@(140),%d1; addql #1,%d1`, re-emitted,

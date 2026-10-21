@@ -48,7 +48,7 @@ too. The cost is a test and a branch per read.
 
 ## Sites
 
-34 sites (1.1 had 38), the claims rytm-mods' registry makes for its default build
+32 sites (1.1 had 38), the claims rytm-mods' registry makes for its default build
 (`registry/allocations.toml`, owner `0004-lfo-rnd`):
 
 | addr | op | |
@@ -63,8 +63,6 @@ too. The cost is a test and a branch per read.
 | 0x400a8dfa | jmp | `jmp lfo_rnd_read_gate` |
 | 0x400a9000 | jmp | `jmp lfo_rnd_setter_gate` |
 | 0x40120fae | jmp | `jmp lfo_rnd_audio_gate` |
-| 0x400cb02a | bytes (code) | `7201` -> `7202` |
-| 0x400cb02e | keep2 | the instruction's address operand -> `lfo_rnd_lfo_pages` (stock `203c401e1b14`) |
 | 0x401bf950 | bytes | `ffffffff` -> `00000000` |
 | 0x401bf958 | bytes | `00000000` -> `00007f00` |
 | 0x401bf970 | bytes | `00000000` -> `00010000` |
@@ -88,7 +86,7 @@ too. The cost is a test and a branch per read.
 | 0x401bfa14 | ptr | pointer -> `lfo_rnd_str_group` |
 | 0x401bfa18 | ptr | pointer -> `lfo_rnd_str_r2dep` |
 
-core-ar2 0.4 entries (1.2): `core_pages` `lfo_rnd_page` (page 12, LFO RND) and `core_params` `lfo_rnd_params` (ids 1..4: `lfo_rnd_get`, `lfo_rnd_delta`, `lfo_rnd_text`), in place of 1.1's four detours at the entries of page_info, page_get_value, param_apply_delta and param_value_text.
+core-ar2 0.4 entries (1.2): `core_pages` `lfo_rnd_page` (page 12, LFO RND) and `core_params` `lfo_rnd_params` (ids 1..4: `lfo_rnd_get`, `lfo_rnd_delta`, `lfo_rnd_text`), in place of 1.1's four detours at the entries of page_info, page_get_value, param_apply_delta and param_value_text; and `core_view_pages` `lfo_rnd_view_page` (LFO RND behind the LFO key, order 20), in place of 1.1's own list for the LFO view.
 
 A detour is a `jmp` site over the whole stock instructions it displaces; the stub re-emits them
 as in rytm-mods. Where rytm-mods patched the address operand of a `jsr`/`lea`/`move.l #`, the

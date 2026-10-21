@@ -9,7 +9,9 @@ From v1.2, euclid-accents, velocity-humanise and voice-dac keep their settings i
 mod storage and build for OS 1.74 only; lfo-rnd uses core-ar2's storage too. From v1.3, lfo-rnd
 1.2, voice-dac 1.3, euclid-accents 1.2 and velocity-humanise 1.2 reach the parameter pages through
 core-ar2 0.4's page tables, so they need core-ar2 0.4 (OS 1.74 only), and other mods with pages
-can link beside them.
+can link beside them. comp-preview 1.1 lists its preview through core 0.4's page-key lists for the
+same reason, so a mod can add a page behind COMP too. comp-preview 1.1 lists its preview through core 0.4's page-key lists for the
+same reason, so a mod can add a page behind COMP too.
 
 No firmware is included: no OS files, sections, dumps or built `.syx`/`.elemod` files. The
 mods name firmware routines by address only (`include/ar2-1.73.inc`, `include/ar2-1.74.inc`), and their `mod.json`

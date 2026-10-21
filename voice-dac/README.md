@@ -60,7 +60,7 @@ checked to allocate them together).
 
 ## Sites
 
-30 sites (1.2 had 34, 1.1 49), from the claims rytm-mods' registry makes for its default build
+28 sites (1.2 had 34, 1.1 49), from the claims rytm-mods' registry makes for its default build
 (`registry/allocations.toml`, owner `0013-voice-dac`), less the 15 that only stored, loaded, cleared or
 protected the values (1.2, below); the timing, prof, burn and dbg builds' extra claims are left out.
 Also a handler on core-ar2's `ev_project`, `voice_dac_vd_project`.
@@ -75,8 +75,6 @@ Also a handler on core-ar2's `ev_project`, `voice_dac_vd_project`.
 | 0x4011fde2 | jmp | `jmp voice_dac_vs_alt` |
 | 0x401212b6 | jmp | `jmp voice_dac_route_all` |
 | 0x40121364 | jmp | `jmp voice_dac_vs_main` |
-| 0x400caf82 | bytes (code) | `7201` -> `7202` |
-| 0x400caf86 | keep2 | the instruction's address operand -> `voice_dac_filter_pages` (stock `203c401e1b1c`) |
 | 0x401bfa28 | bytes | `00000000` -> `00007f00` |
 | 0x401bfa44 | ptr | pointer -> `voice_dac_txt_frq_long` |
 | 0x401bfa4c | ptr | pointer -> `voice_dac_txt_frq_short` |
@@ -98,7 +96,7 @@ Also a handler on core-ar2's `ev_project`, `voice_dac_vd_project`.
 | 0x401c5614 | ptr | pointer -> `voice_dac_txt_pol_long` |
 | 0x401c561c | ptr | pointer -> `voice_dac_txt_pol_short` |
 
-core-ar2 0.4 entries (1.3): `core_pages` `voice_dac_page` (page 13, DAC FILTER) and four `core_params` entries, `voice_dac_p5`, `voice_dac_p7`, `voice_dac_p11` (ids 11..14) and `voice_dac_p457` (`vd_param_get`, `vd_param_delta`, `vd_param_text`), in place of 1.2's four detours at the entries of page_info, page_get_value, param_apply_delta and param_value_text. FRQ, RES and TYP text still goes to stock's own ids (`text` returns 2), so filter-hz shows FRQ in Hz as before.
+core-ar2 0.4 entries (1.3): `core_pages` `voice_dac_page` (page 13, DAC FILTER) and four `core_params` entries, `voice_dac_p5`, `voice_dac_p7`, `voice_dac_p11` (ids 11..14) and `voice_dac_p457` (`vd_param_get`, `vd_param_delta`, `vd_param_text`), in place of 1.2's four detours at the entries of page_info, page_get_value, param_apply_delta and param_value_text. FRQ, RES and TYP text still goes to stock's own ids (`text` returns 2), so filter-hz shows FRQ in Hz as before. `core_view_pages` `voice_dac_view_page` puts DAC FILTER behind the FILTER key (order 20), in place of 1.2's own list for the FILTER view.
 
 A detour is a `jmp` site over the whole stock instructions it displaces; the stub re-emits them
 as in rytm-mods. Where rytm-mods patched the address operand of a `jsr`/`lea`/`move.l #`, the

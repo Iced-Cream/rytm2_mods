@@ -805,10 +805,9 @@ audio_gate:
         | Data
         | ------------------------------------------------------------------
         .align  2
-        .globl  lfo_rnd_lfo_pages
-lfo_rnd_lfo_pages:
-lfo_pages:                                        | the voice LFO view's pages
-        .long   PAGE_LFO, PAGE_RND
+        .globl  lfo_rnd_view_page                 | core_view_pages: behind LFO
+lfo_rnd_view_page:
+        .long   4, PAGE_RND                       | CORE_VIEW_LFO
 
         .globl  lfo_rnd_page, lfo_rnd_params
 lfo_rnd_page:                                     | core_pages: page 12

@@ -233,6 +233,12 @@
         .endif
         .equ    VIEW_SELPAGE,   0x8c
         .equ    VIEW_PAGEKEY,   0x88              | the view's own page key's id
+        | elemod: the view's page list (a vector: its first element), so the
+        | preview is told apart by its page, 11 again past the first entry,
+        | rather than by any entry past the first: core-ar2 0.4 lists other
+        | mods' pages in the same view (duck's DUCK).
+        .equ    VIEW_PAGES,     0x7c
+        .equ    PAGE_COMP,      11
         | Set on a page key's press when it is the view's own; its release cycles
         | the page only while it is set (0x4003ab08, 0x4003a834).
         .equ    CYCLE_ARMED,    0x417e32b9
@@ -975,8 +981,12 @@ comp_draw:
         .endif
         move.l  4(%sp),%a0
         move.l  VIEW_SELPAGE(%a0),%d0
-        bne.s   1f
-        jmp     PARAM_DRAW
+        beq.s   0f
+        move.l  VIEW_PAGES(%a0),%a1               | elemod: the preview's page?
+        moveq   #PAGE_COMP,%d1
+        cmp.l   (%a1,%d0.l*4),%d1
+        beq.s   1f
+0:      jmp     PARAM_DRAW
 
 1:
         moveq   #TRACE_THR,%d1
@@ -1135,8 +1145,12 @@ draw_seg:
 comp_preview_comp_keys:
 comp_keys:
         move.l  4(%sp),%a0
-        tst.l   VIEW_SELPAGE(%a0)
+        move.l  VIEW_SELPAGE(%a0),%d0
         beq.s   9f
+        move.l  VIEW_PAGES(%a0),%a1               | elemod: the preview's page?
+        moveq   #PAGE_COMP,%d1
+        cmp.l   (%a1,%d0.l*4),%d1
+        bne.s   9f
         move.l  8(%sp),%a1
         btst    #0,19(%a1)
         beq.s   9f                                | not a press
@@ -1611,13 +1625,11 @@ grmode:
 hrestab:
         .byte   86,43,22,11,5,3
         .balign 4
-        | The page vector source: stock page 11 twice, stock and the preview,
-        | read once by the constructor.
-        .globl  comp_preview_comp_pages
-comp_preview_comp_pages:
-comp_pages:
-        .long   11
-        .long   11
+        | elemod: the preview, stock page 11 listed again in the COMP view,
+        | through core-ar2 0.4's core_view_pages: {CORE_VIEW_COMP, 11}.
+        .globl  comp_preview_view_page
+comp_preview_view_page:
+        .long   8, 11
         .align  2
         | Per ratio, indexed by the stored RAT value, hardest first (the device
         | labels 0..3 1:2, 1:4, 1:8, MAX): knee Q8 dB, width Q8 dB, 2^22 / width,
