@@ -127,7 +127,7 @@ keep it, and the `out/` build folders, out of git and out of any upload.
 | 0006-comp-preview | `comp-preview/` | hardware-verified | matches label by label; **confirmed on a unit** |
 | 0009-main-rms | `main-rms/` | built (MANUAL: display checked on the device) | matches label by label; **confirmed on a unit** |
 | 0010-kit-ab | `kit-ab/` | hardware-verified | matches label by label; **confirmed on a unit** |
-| 0013-voice-dac | `voice-dac/` | hardware-verified | default build only (no timing, prof, burn or dbg); 1.1, MrScruff's update (76ae299): matches label by label but for three names where sections meet; 1.0 **confirmed on a unit** |
+| 0013-voice-dac | `voice-dac/` | hardware-verified | default build only (no timing, prof, burn or dbg); 1.2 moves DAC SUM off tracks 1's and 2's MIDI channels in the project globals (from code reading, not yet on a unit); 1.1, MrScruff's update (76ae299): matches label by label but for three names where sections meet; 1.0 **confirmed on a unit** |
 
 Every mod on rytm-mods-src main is now ported. "Matches label by label": `tools/verify_port.py`
 re-assembles rytm-mods' own code, checks it equals rytm-mods-src's default build ("T2"), then

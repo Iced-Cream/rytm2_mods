@@ -11,6 +11,17 @@ and POL are set the same on every track (the type the selected track reaches, th
 FUNC + TRK + turn on ATK or SUS moves each track to its own next stop of -64, 0 and +63. It works
 whether ctrl-all is in the build or not.
 
+In 1.2 DAC SUM moves in the project's globals record (`projectGlobalsStorage_v2_t`, 80 bytes, four of
+them): from stored bytes 12 (tag 0xd5) and 13 to 77 and 78. Stock's globals load (0x4000763c, the loop
+at 0x40007704) and save (0x40007a5c, the loop at 0x40007aae) carry bytes 12..24 as the 13 tracks' MIDI
+channels (-1..15), and voice-dac's save stub (0x40007bb0) runs after that loop, so every globals save
+overwrote track 1's channel with the tag and track 2's with DAC SUM: after a reload track 1 fell back to
+channel 1, and track 2 read channel 1 whenever DAC SUM was off. Stock stores bytes 0..74; pad-select
+takes 75 and 76, so DAC SUM takes 77 and 78. A record with no tag at 77 still loads DAC SUM from 13
+under the tag at 12, so projects saved by 1.1 keep it; their tracks 1 and 2 keep the default channels
+(1 and 2) until set again and saved. The sites are unchanged. Found by reading OS 1.74's code; 1.73's
+load and save are at the same addresses with the same bytes at both sites.
+
 ## Sites
 
 49 sites, the claims rytm-mods' registry makes for its default build
@@ -82,6 +93,8 @@ table is a `ptr` site.
   claims and code its diagnostic params select are left out.
 - Every section the stub had in separate caves is `.text` here, one `.run` the linker places in
   the DDR mods area.
+- DAC SUM is stored at globals bytes 77 and 78, not rytm-mods' 12 and 13, which are stock's MIDI
+  channels of tracks 1 and 2 (1.2, above); dac_load also reads 12 and 13 for projects saved by 1.1.
 - 0000-shared's runtime is assembled into the mod, at the end of the unit (`../shared/shared.s`): its references into it, absolute in rytm-mods, are PC-relative here, so the code is a few bytes shorter.
 
 ## Test (on a unit)
@@ -90,8 +103,16 @@ table is a `ptr` site.
 2. TYP LP2 and FRQ down while a pattern plays: the voice darkens. ATK/SUS shape the hits.
 3. DAC SUM OFF: FILTER twice stays on the stock page.
 4. Listen for glitches on a busy pattern: the filter runs in the audio interrupt, now from the DDR mods area.
+5. MIDI channels (1.2): set tracks 1's and 2's MIDI channels to something other than their defaults
+   (say 5 and 6), DAC SUM OFF, save the project, power-cycle: both channels and DAC SUM OFF survive.
+   Again with DAC SUM ON. Then load a project saved by 1.1 with DAC SUM ON: it loads ON.
 
 ## Results so far
+
+1.2 (DAC SUM at globals bytes 77 and 78): the object's `.text` is 16 B longer than 1.1's (the load's
+fallback to 1.1's bytes; not yet linked with elekloader); both sources assemble with `m68k-elf-as -mcpu=5475`, and the load and save stubs assemble to the
+same code in both. `os1.74/` was edited by hand, the same edit as the 1.73 source: the change names no
+firmware address, so `tools/port_os.py` would move nothing in it. Not yet run on a unit or in rytm-emu.
 
 1.1 (MrScruff's update): `.run` 11424 B, 49 sites, 24 relocations; `tools/verify_port.py` against
 rytm-mods-src 76ae299's default build: the re-assembly equals its caves, and 110 of 113 labels match;

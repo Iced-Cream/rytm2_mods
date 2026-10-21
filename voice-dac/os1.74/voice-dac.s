@@ -15,8 +15,8 @@
         | Switched at run time by DAC SUM, the last item of the AUDIO ROUTING
         | menu. OFF is stock's routing and no sum. It is saved with the
         | project's globals, beside the routing it overrides: stored bytes
-        | +12 (tag) and +13 of projectGlobalsStorage_v2_t, which stock's load
-        | and save never touch; a project without the tag loads as OFF.
+        | +77 (tag) and +78 of projectGlobalsStorage_v2_t, past the 0..74 stock
+        | uses; a project without the tag loads as OFF (elemod).
         |
         | Each voice is filtered before the sum, set by its track's DAC FILTER
         | page (page 13, reached by pressing FILTER again while DAC SUM is on):
@@ -268,12 +268,18 @@
         .equ    LOAD_RESUME,    0x40008270
         .equ    IDLE_RESUME,    0x400a2b22
         | DAC SUM in the project's globals (projectGlobalsStorage_v2_t, loaded
-        | by 0x4000763c and saved by 0x40007a5c; stored bytes 12..24 are
-        | touched by neither). ProjectGlobals is the project's member at +236;
-        | its vtable +80, called with (object, 0), is the change notice stock's
-        | routing setters end with.
-        .equ    OFF_DAC_TAG,    12
-        .equ    OFF_DAC_ON,     13
+        | by 0x4000763c and saved by 0x40007a5c). elemod: the record is 80
+        | bytes and stock stores 0..74 of it; 12..24 are the 13 tracks' MIDI
+        | channels (the loops at 0x40007704 and 0x40007aae), where voice-dac
+        | 1.1 kept DAC SUM, over tracks 1's and 2's. 75 and 76 are pad-select's,
+        | so DAC SUM is at 77 and 78; the load still reads 1.1's 12 and 13
+        | when 77 holds no tag (OFF_OLD_*). ProjectGlobals is the project's
+        | member at +236; its vtable +80, called with (object, 0), is the
+        | change notice stock's routing setters end with.
+        .equ    OFF_DAC_TAG,    77
+        .equ    OFF_DAC_ON,     78
+        .equ    OFF_OLD_TAG,    12                | elemod: voice-dac 1.1's place,
+        .equ    OFF_OLD_ON,     13                | read by dac_load only
         .equ    DAC_TAG,        0xd5
         .equ    PROJ_GLOBALS,   236
         .equ    VT_CHANGED,     80
@@ -1261,12 +1267,13 @@ hpf_refresh:
         | projectGlobals_t's load (0x4000763c), after its version check, over
         | `mvsb %a2@(4),%d1; moveq #1,%d2`, both re-emitted: a2 the stored
         | record, a3 the live one. The boot loop loads four (0x4000ce1c), so
-        | the value goes to that live record's entry in dac_rec - stored +13
-        | under the tag at +12, or OFF - and hpf_refresh picks the active
-        | record's. A single flag, set by every load, took the last record's
-        | and lost the active one's (hardware, 2026-09-28); an untouched record
-        | can hold leftovers there (the fourth read 00 01), which the tag keeps
-        | out. d0 is written again before it is read.
+        | the value goes to that live record's entry in dac_rec - stored +78
+        | under the tag at +77, else +13 under the tag at +12 (saved by 1.1),
+        | else OFF - and hpf_refresh picks the active record's. A single flag,
+        | set by every load, took the last record's and lost the active one's
+        | (hardware, 2026-09-28); an untouched record can hold leftovers there
+        | (the fourth read 00 01), which the tag keeps out. A stock channel at
+        | +12 is -1..15, never the tag. d0 is written again before it is read.
         | ------------------------------------------------------------------
         .align  2
         .globl  voice_dac_dac_load
@@ -1277,10 +1284,15 @@ dac_load:
         move.l  %a3,%a0
         bsr.w   dac_slot                          | d0 = this live record's entry
         moveq   #0,%d1
-        mvz.b   OFF_DAC_TAG(%a2),%d2              | d2 is set again after
+        lea     OFF_DAC_TAG(%a2),%a1              | elemod: the tag, then its value
+        mvz.b   (%a1),%d2                         | d2 is set again after
+        cmp.l   #DAC_TAG,%d2
+        beq.s   2f
+        lea     OFF_OLD_TAG(%a2),%a1              | elemod: or 1.1's
+        mvz.b   (%a1),%d2
         cmp.l   #DAC_TAG,%d2
         bne.s   1f
-        tst.b   OFF_DAC_ON(%a2)
+2:      tst.b   1(%a1)
         sne     %d1
         and.l   #1,%d1                            | 1 or 0
 1:      lea     dac_rec,%a1
@@ -1300,8 +1312,8 @@ dac_load:
         | ------------------------------------------------------------------
         | projectGlobals_t's save (0x40007a5c), over `moveq #2,%d0` and the
         | first four bytes of `moveb %a3@(211),%a2@(70)`, both re-emitted: a2
-        | the stored record. The tag at +12 and DAC SUM at +13. d1 is not read
-        | again.
+        | the stored record, its MIDI channels at +12..24 already stored. The
+        | tag at +77 and DAC SUM at +78 (elemod). d1 is not read again.
         | ------------------------------------------------------------------
         .align  2
         .globl  voice_dac_dac_save
