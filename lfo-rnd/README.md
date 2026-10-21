@@ -48,7 +48,7 @@ too. The cost is a test and a branch per read.
 
 ## Sites
 
-32 sites (1.1 had 38), the claims rytm-mods' registry makes for its default build
+31 sites (1.1 had 38), the claims rytm-mods' registry makes for its default build
 (`registry/allocations.toml`, owner `0004-lfo-rnd`):
 
 | addr | op | |
@@ -56,7 +56,6 @@ too. The cost is a test and a branch per read.
 | 0x40039d32 | jmp | `jmp lfo_rnd_list_same_gate` |
 | 0x40039d9a | jmp | `jmp lfo_rnd_list_new_gate` |
 | 0x4003a5f2 | jmp | `jmp lfo_rnd_knob_cidx_gate` |
-| 0x4003ab94 | jmp | `jmp lfo_rnd_title_after_cycle` |
 | 0x4004aec6 | jmp | `jmp lfo_rnd_list_filter_gate` |
 | 0x4009b000 | jmp | `jmp lfo_rnd_trig_cfg_gate` |
 | 0x400a857c | jmp | `jmp lfo_rnd_knob_draw_gate` |
@@ -86,7 +85,7 @@ too. The cost is a test and a branch per read.
 | 0x401bfa14 | ptr | pointer -> `lfo_rnd_str_group` |
 | 0x401bfa18 | ptr | pointer -> `lfo_rnd_str_r2dep` |
 
-core-ar2 0.4 entries (1.2): `core_pages` `lfo_rnd_page` (page 12, LFO RND) and `core_params` `lfo_rnd_params` (ids 1..4: `lfo_rnd_get`, `lfo_rnd_delta`, `lfo_rnd_text`), in place of 1.1's four detours at the entries of page_info, page_get_value, param_apply_delta and param_value_text; and `core_view_pages` `lfo_rnd_view_page` (LFO RND behind the LFO key, order 20), in place of 1.1's own list for the LFO view.
+core-ar2 0.4 entries (1.2): `core_pages` `lfo_rnd_page` (page 12, LFO RND) and `core_params` `lfo_rnd_params` (ids 1..4: `lfo_rnd_get`, `lfo_rnd_delta`, `lfo_rnd_text`), in place of 1.1's four detours at the entries of page_info, page_get_value, param_apply_delta and param_value_text; and `core_view_pages` `lfo_rnd_view_page` (LFO RND behind the LFO key, order 20), in place of 1.1's own list for the LFO view. The header's title after the page key's step, which 1.1 pushed itself for every view (0x4003ab94), is core-ar2 0.4's.
 
 A detour is a `jmp` site over the whole stock instructions it displaces; the stub re-emits them
 as in rytm-mods. Where rytm-mods patched the address operand of a `jsr`/`lea`/`move.l #`, the

@@ -40,12 +40,6 @@
  },
  "sites": [
   {
-   "addr": "0x4003ab86",
-   "stock": "222a008c5281",
-   "op": "jmp",
-   "target": "voice_dac_hpf_cycle"
-  },
-  {
    "addr": "0x400a2aae",
    "stock": "48d71c04246e0008",
    "op": "jmp",
@@ -217,12 +211,6 @@
     "os1.74/voice-dac.s"
    ],
    "sites": [
-    {
-     "addr": "0x4003ab86",
-     "stock": "222a008c5281",
-     "op": "jmp",
-     "target": "voice_dac_hpf_cycle"
-    },
     {
      "addr": "0x400a2b1a",
      "stock": "48d71c04246e0008",

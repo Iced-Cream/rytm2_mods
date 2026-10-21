@@ -56,8 +56,6 @@
         | 0.4's core_pages and core_params: core asks vd_param_get, _delta and
         | _text below for them; 1.2 detoured page_info, page_get_value,
         | param_apply_delta and param_value_text itself):
-        |   hpf_cycle     0x4003ab86  the page key's cycle: FILTER's page 2 only
-        |                             while DAC SUM is on
         |   flt_glyph     0x400a8584  param_knob_draw: TYP as stock's TYP glyph
         |   flt_graph     0x400d2e42  sound_page_draw: stock's FILTER graph
         | and for the caches the audio interrupt reads:
@@ -218,7 +216,6 @@
         .equ    TRIG_KEYS,      16                | key ids 0..15, as 0014
         .equ    PROJ_TRACKSEL,  48                | as 0000-shared's
         .equ    VIEW_INVALIDATE, 0x40078580
-        .equ    CYCLE_RESUME,   0x4003ab8c
         .equ    IDLE_RESUME,    0x400a2b22
         | DAC SUM, the global field vd_dac. ProjectGlobals is the project's
         | member at +236; its vtable +52 answers the active live record, and
@@ -845,31 +842,20 @@ voice_dac_p7:   .long   ID_ATK, ID_ATK, vd_param_get, vd_param_delta, vd_param_t
 voice_dac_p11:  .long   ID_TYP, ID_SUS, vd_param_get, vd_param_delta, vd_param_text
 voice_dac_p457: .long   ID_POL, ID_POL, vd_param_get, vd_param_delta, vd_param_text
         | core_view_pages: DAC FILTER behind FILTER.
+        | The FILTER key steps to it only while DAC SUM is on (shown, below).
         .globl  voice_dac_view_page
 voice_dac_view_page:
-        .long   2, PAGE_HPF                       | CORE_VIEW_FILTER
+        .long   2, PAGE_HPF, vd_shown             | CORE_VIEW_FILTER
 
         | ------------------------------------------------------------------
-        | The page key's cycle, `movel %a2@(140),%d1; addql #1,%d1`, re-emitted,
-        | before `remsl %d0,%d2,%d1` makes it the new index. On the FILTER view -
-        | its first page is 6 - while DAC SUM is off the index stays 0, so the
-        | DAC FILTER page is never shown. d2 is overwritten by the remsl and a0 reloaded
-        | after, so both are free.
+        | vd_shown(view) -> d0 = DAC SUM: core-ar2 0.4 asks it on each press of
+        | the FILTER key, and steps over DAC FILTER while it answers 0. (1.3's
+        | first builds hooked the key's cycle itself.)
         | ------------------------------------------------------------------
         .align  2
-        .globl  voice_dac_hpf_cycle
-voice_dac_hpf_cycle:
-hpf_cycle:
-        move.l  140(%a2),%d1                      | displaced
-        addq.l  #1,%d1                            | displaced
-        tst.l   dac_on
-        bne.s   9f
-        move.l  124(%a2),%a0
-        moveq   #PAGE_FILTER,%d2
-        cmp.l   (%a0),%d2
-        bne.s   9f
-        moveq   #0,%d1
-9:      jmp     CYCLE_RESUME
+vd_shown:
+        move.l  dac_on,%d0
+        rts
 
         | ------------------------------------------------------------------
         | A knob's values as one hpf_track entry: TYP << 24 | FRQ << 16 | DEP

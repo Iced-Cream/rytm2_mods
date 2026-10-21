@@ -31,12 +31,6 @@
    "target": "lfo_rnd_knob_cidx_gate"
   },
   {
-   "addr": "0x4003ab94",
-   "stock": "2f0a4eb940078514",
-   "op": "jmp",
-   "target": "lfo_rnd_title_after_cycle"
-  },
-  {
    "addr": "0x4004aec6",
    "stock": "4eb9400aa214",
    "op": "jmp",
@@ -241,12 +235,6 @@
      "stock": "4eb940006ea8",
      "op": "jmp",
      "target": "lfo_rnd_knob_cidx_gate"
-    },
-    {
-     "addr": "0x4003ab94",
-     "stock": "2f0a4eb940078580",
-     "op": "jmp",
-     "target": "lfo_rnd_title_after_cycle"
     },
     {
      "addr": "0x4004aec6",

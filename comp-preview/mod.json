@@ -29,12 +29,6 @@
    "stock": "400c674c",
    "op": "ptr",
    "target": "comp_preview_comp_draw"
-  },
-  {
-   "addr": "0x401e1208",
-   "stock": "4003762e",
-   "op": "ptr",
-   "target": "comp_preview_comp_setsel"
   }
  ],
  "requires": [
@@ -63,12 +57,6 @@
      "stock": "400c67b8",
      "op": "ptr",
      "target": "comp_preview_comp_draw"
-    },
-    {
-     "addr": "0x401e14b8",
-     "stock": "4003762e",
-     "op": "ptr",
-     "target": "comp_preview_comp_setsel"
     }
    ]
   }

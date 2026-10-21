@@ -52,46 +52,8 @@
         | text below for them from page_info, page_get_value, param_apply_delta
         | and param_value_text's entries. (1.1 detoured those four itself.)
 
-        | ------------------------------------------------------------------
-        | The page key's cycle, then the header title.
-        |
-        | page_view_activate pushes the title once, before the key handler cycles
-        | to the next page, so the header lagged one page. Reached by a jmp over
-        | `movel %a2,%sp@-; jsr 0x40078514` right after the cycle; a2 is the view.
-        | Re-emits both - the pushed view stays for stock's addql #8 - then pushes
-        | the new page's title exactly as page_view_activate does.
-        | ------------------------------------------------------------------
-        .equ    VT_TITLE,       0x4c
-        .equ    VIEW_UI,        108
-
-        .align  2
-        .globl  lfo_rnd_title_after_cycle
-lfo_rnd_title_after_cycle:
-title_after_cycle:
-        move.l  %a2,-(%sp)                        | displaced
-        jsr     0x40078514                        | displaced
-        lea     -24(%sp),%sp
-        movem.l %d0-%d1/%a0-%a1,(%sp)             | string at 20(sp), alloc byte at 19(sp)
-        move.l  %a2,-(%sp)
-        move.l  (%a2),%a0
-        move.l  VT_TITLE(%a0),%a0
-        jsr     (%a0)                             | d0 = title
-        addq.l  #4,%sp
-        pea     19(%sp)                           | allocator
-        move.l  %d0,-(%sp)                        | c string
-        pea     28(%sp)                           | &string
-        jsr     std_string_from_cstr
-        lea     12(%sp),%sp
-        pea     20(%sp)                           | &string
-        move.l  VIEW_UI(%a2),-(%sp)
-        jsr     ui_set_title
-        addq.l  #8,%sp
-        pea     20(%sp)
-        jsr     std_string_dtor
-        addq.l  #4,%sp
-        movem.l (%sp),%d0-%d1/%a0-%a1
-        lea     24(%sp),%sp
-        jmp     page_cycle_after_invalidate
+        | The header's title after the page key's step is core-ar2 0.4's (1.1 and
+        | 1.2's first builds pushed it here, for every view).
 
         | ------------------------------------------------------------------
         | field_of(d0 = parameter id) -> d0 = field 0..3, or C set if not ours
@@ -807,7 +769,7 @@ audio_gate:
         .align  2
         .globl  lfo_rnd_view_page                 | core_view_pages: behind LFO
 lfo_rnd_view_page:
-        .long   4, PAGE_RND                       | CORE_VIEW_LFO
+        .long   4, PAGE_RND, 0                    | CORE_VIEW_LFO, always shown
 
         .globl  lfo_rnd_page, lfo_rnd_params
 lfo_rnd_page:                                     | core_pages: page 12

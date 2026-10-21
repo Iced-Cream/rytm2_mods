@@ -1205,24 +1205,9 @@ comp_keys:
 8:      moveq   #1,%d0                            | handled
         rts
 
-        | ------------------------------------------------------------------
-        | comp_setsel - the compressor vtable's set-sub-page slot, +0x60. The FX
-        | page code at 0x400cbcd4 shows the view and then, when the page shown
-        | before it was a different one, sets its sub-page to 0 - so coming back
-        | drew the preview for a frame and then dropped to the stock page. A
-        | request for 0 is taken as a request for the current sub-page; stock's
-        | setter still runs, with its redraw.
-        | ------------------------------------------------------------------
-        .equ    STOCK_SETSEL,   0x4003762e
-        .align  2
-        .globl  comp_preview_comp_setsel
-comp_preview_comp_setsel:
-comp_setsel:
-        tst.l   8(%sp)
-        bne.s   1f
-        move.l  4(%sp),%a0                        | the view
-        move.l  VIEW_SELPAGE(%a0),8(%sp)
-1:      jmp     STOCK_SETSEL
+        | The COMP view keeps its page when the FX track shows it again: core-ar2
+        | 0.4 does that for every view (1.0 and 1.1's first builds took the
+        | compressor vtable's set-page slot, +0x60, here).
         .align  2
 
 
@@ -1629,7 +1614,7 @@ hrestab:
         | through core-ar2 0.4's core_view_pages: {CORE_VIEW_COMP, 11}.
         .globl  comp_preview_view_page
 comp_preview_view_page:
-        .long   8, 11
+        .long   8, 11, 0                          | always shown
         .align  2
         | Per ratio, indexed by the stored RAT value, hardest first (the device
         | labels 0..3 1:2, 1:4, 1:8, MAX): knee Q8 dB, width Q8 dB, 2^22 / width,
