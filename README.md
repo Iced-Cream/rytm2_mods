@@ -93,12 +93,13 @@ reach only the selected track on 1.74.
 You need:
 
 - an [elekloader](https://github.com/irpina/elekloader) checkout at `main` from
-  irpina/elekloader#147 on (core-ar2 0.3) and the Python 3 it asks for;
+  irpina/elekloader#155 on (core-ar2 0.4) and the Python 3 it asks for;
 - ColdFire binutils on `PATH` (`m68k-linux-gnu-as` and `-ld`; on Debian or Ubuntu,
   `apt install binutils-m68k-linux-gnu`);
 - your own copy of Elektron's stock Analog Rytm MKII OS 1.74 `.syx`. It is never part
-  of this repository or of anything built from it. (On OS 1.73, elekloader builds core-ar2 0.2,
-  which takes the seven mods without storage and lfo-rnd; the other three need 0.3.)
+  of this repository or of anything built from it. (On OS 1.73, v1.0 still has all eleven mods;
+  its own README says which elekloader it builds with. v1.2's lfo-rnd, voice-dac, euclid-accents,
+  velocity-humanise and comp-preview do not link with core 0.4, so v1.3's are needed for it.)
 
 ```bash
 EL=path/to/elekloader                        # the elekloader checkout
@@ -115,7 +116,7 @@ for m in $MODS; do
   V=$(python3 -c "import json; print(json.load(open('$R2/$m/mod.json'))['version'])")
   ARGS="$ARGS --mod $R2/$m/out/$m-$V$OS.elemod"
 done
-python3 -m elekloader.patch --stock "$STOCK" --mod mods/core-ar2/out/core-0.3.elemod $ARGS \
+python3 -m elekloader.patch --stock "$STOCK" --mod mods/core-ar2/out/core-0.4.elemod $ARGS \
     --out rytm-mods.syx --version R2AL --lockfile rytm-mods.lock.json
 ```
 
