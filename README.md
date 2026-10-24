@@ -95,7 +95,7 @@ reach only the selected track on 1.74.
 You need:
 
 - an [elekloader](https://github.com/irpina/elekloader) checkout at `main` with core-ar2 0.6
-  and the Python 3 it asks for (v1.3 builds with core-ar2 0.4 or 0.5, from irpina/elekloader#155 on);
+  (irpina/elekloader#179) and the Python 3 it asks for (v1.3 builds with core-ar2 0.4 or 0.5, from irpina/elekloader#155 on);
 - ColdFire binutils on `PATH` (`m68k-linux-gnu-as` and `-ld`; on Debian or Ubuntu,
   `apt install binutils-m68k-linux-gnu`);
 - your own copy of Elektron's stock Analog Rytm MKII OS 1.74 `.syx`. It is never part
@@ -145,7 +145,7 @@ keep it, and the `out/` build folders, out of git and out of any upload.
 | 0006-comp-preview | `comp-preview/` | hardware-verified | 1.1, its preview in core-ar2 0.4's COMP list: **confirmed on a unit** on OS 1.74, also beside duck; 1.0 matches label by label, **confirmed on a unit** |
 | 0009-main-rms | `main-rms/` | built (MANUAL: display checked on the device) | matches label by label; **confirmed on a unit** |
 | 0010-kit-ab | `kit-ab/` | hardware-verified | matches label by label; **confirmed on a unit** |
-| 0013-voice-dac | `voice-dac/` | hardware-verified | default build only (no timing, prof, burn or dbg); 1.1, MrScruff's update (76ae299): matches label by label but for three names where sections meet; 1.4 (3a98e23, knobs follow TYP) on core-ar2 0.6: emulator only so far; 1.3 on core-ar2 0.4's pages and 1.2, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 **confirmed on a unit** |
+| 0013-voice-dac | `voice-dac/` | hardware-verified | default build only (no timing, prof, burn or dbg); 1.1, MrScruff's update (76ae299): matches label by label but for three names where sections meet; 1.4 (3a98e23, knobs follow TYP) on core-ar2 0.6: **confirmed on a unit** on OS 1.74; 1.3 on core-ar2 0.4's pages and 1.2, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 **confirmed on a unit** |
 
 Every mod on rytm-mods-src main is now ported. "Matches label by label": `tools/verify_port.py`
 re-assembles rytm-mods' own code, checks it equals rytm-mods-src's default build ("T2"), then

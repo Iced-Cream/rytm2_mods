@@ -167,7 +167,14 @@ with core 0.4 (their sites overlap core's), and 1.3 does not link with core 0.3.
   1.3: a 59-screen walk (boot, DAC SUM on, DAC FILTER through every TYP, LFO and FX pages) is
   pixel-identical but for the DAC FILTER screens with TYP OFF, LP1 and HP1, where FRQ/RES and RES
   are empty as intended. RES's knob does nothing on LP1, FRQ's and RES's nothing on OFF, and the
-  page follows a switch from BD (LP1) to SD (OFF) and back. Not yet on a unit.
+  page follows a switch from BD (LP1) to SD (OFF) and back.
+- Hardware, Analog Rytm MKII OS 1.74, 2026-10-23, V6A4 plus the analoghealth test mod for remote
+  keys (V6A4 rebuilt byte for byte with it; analoghealth hooks none of core 0.6's or the mods'
+  sites): every test step passes. DAC FILTER through every TYP, the empty knobs inert, the page
+  following TRK + SD and back, RES kept across LP2, LP1 and LP2, the LFO RND, velocity, euclid and
+  COMP preview pages as on U4A4, and BD's DAC FILTER back as saved after SAVE KIT, a power cycle
+  and RELOAD. BD on LP2, LP1 and OFF: no dropouts, nothing audible. Not compared with a v1.3
+  recording.
 
 ### 1.3 on core-ar2 0.4
 
