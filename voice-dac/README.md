@@ -3,7 +3,8 @@
 Port of rytm-mods-src `mods/0013-voice-dac` (MrScruff; hardware-verified there). Full usage: rytm-mods-src
 `docs/MANUAL.md`, section 0013.
 
-GLOBAL > AUDIO ROUTING > DAC SUM (last item): ON routes every voice to the main mix through the DAC. With it on, FILTER pressed twice opens DAC FILTER: a per-voice filter (FRQ, RES, TYP OFF/LP2/LP1/BP/HP1/HP2/BS/PK, DEP), a transient shaper (ATK, SUS) and polarity, after the analog filter. Saved with the project and the sound.
+GLOBAL > AUDIO ROUTING > DAC SUM (last item): ON routes every voice to the main mix through the DAC. With it on, FILTER pressed twice opens DAC FILTER: a per-voice filter (FRQ, RES, TYP OFF/LP2/LP1/BP/HP1/HP2/BS/PK, DEP), a transient shaper (ATK, SUS) and polarity, after the analog filter. Saved with the project and the sound. From 1.4 the page shows only the
+knobs the selected sound's TYP uses: no RES for LP1 and HP1, and neither FRQ nor RES with TYP OFF.
 
 In 1.1 (rytm-mods-src 76ae299, MrScruff's update), with ctrl-all's gesture on the DAC FILTER page:
 TRK + turn with no trig key held steps that knob on every voice track, each within its own limits; TYP
@@ -95,6 +96,10 @@ Also a handler on core-ar2's `ev_project`, `voice_dac_vd_project`.
 | 0x401c5614 | ptr | pointer -> `voice_dac_txt_pol_long` |
 | 0x401c561c | ptr | pointer -> `voice_dac_txt_pol_short` |
 
+core-ar2 0.6 entry (1.4): `core_page_fns` `voice_dac_page_fn` (page 13, DAC FILTER), whose `info`,
+`vd_page_info`, answers `page_hpf`, `page_hpf_1p` (no RES, for LP1 and HP1) or `page_hpf_off` (no FRQ
+or RES, for TYP OFF) from the selected sound's TYP, in place of 1.3's `core_pages` entry.
+
 core-ar2 0.4 entries (1.3): `core_pages` `voice_dac_page` (page 13, DAC FILTER) and four `core_params` entries, `voice_dac_p5`, `voice_dac_p7`, `voice_dac_p11` (ids 11..14) and `voice_dac_p457` (`vd_param_get`, `vd_param_delta`, `vd_param_text`), in place of 1.2's four detours at the entries of page_info, page_get_value, param_apply_delta and param_value_text. FRQ, RES and TYP text still goes to stock's own ids (`text` returns 2), so filter-hz shows FRQ in Hz as before. `core_view_pages` `voice_dac_view_page` puts DAC FILTER behind the FILTER key (order 20), in place of 1.2's own list for the FILTER view; its `shown`, `vd_shown`, answers DAC SUM, so the key steps over the page while DAC SUM is off, in place of 1.2's own hook on the key's cycle (0x4003ab86).
 
 A detour is a `jmp` site over the whole stock instructions it displaces; the stub re-emits them
@@ -103,6 +108,16 @@ site is elemod's `keep2` (the opcode word kept, the address the mod's). A pointe
 table is a `ptr` site.
 
 ## Changes from rytm-mods
+
+### 1.4: DAC FILTER's knobs follow TYP (rytm-mods-src 3a98e23)
+
+MrScruff's update: with TYP LP1 or HP1, RES's slot on DAC FILTER is empty (no dial, no label, the
+knob does nothing), as RES means nothing for the 1-pole types; with TYP OFF, FRQ's is too. The
+graph clears the empty-knob marks stock draws in those slots. rytm-mods answers page_info's entry
+itself; here the entry comes from core-ar2 0.6's `core_page_fns`, which asks `vd_page_info` on
+every page_info call, so the page follows TYP and the selected track at each redraw, as
+rytm-mods' does. The graph's code is rytm-mods'. Needs core-ar2 0.6 (`"resources": {"core":
+"0.6"}`); 1.3 still links with core 0.6. Storage and the lockfile are unchanged from 1.3.
 
 ### 1.3: on core-ar2 0.4's page tables
 
@@ -139,7 +154,27 @@ with core 0.4 (their sites overlap core's), and 1.3 does not link with core 0.3.
 8. (1.2) With lfo-rnd 1.1 in the build: LFO RND and DAC FILTER settings on one sound both survive a
    kit save and reload and a power cycle. The VELOCITY MOD menu reads as on stock.
 
+9. (1.4) DAC FILTER, TYP OFF: no FRQ or RES knob, label or dial, and turning those two knobs does
+   nothing. TYP LP2, BP, HP2, BS, PK: FRQ and RES both there. TYP LP1 or HP1: FRQ only, RES's knob
+   does nothing. No knob mark left under the graph in any of them.
+10. (1.4) BD on LP1, SD on OFF: TRK + SD, then TRK + BD, on DAC FILTER: the page changes with the track.
+
 ## Results so far
+
+### 1.4 on core-ar2 0.6
+
+- rytm-emu, OS 1.74, core-ar2 0.6 with all eleven mods (V6A4) against the same mods with voice-dac
+  1.3: a 59-screen walk (boot, DAC SUM on, DAC FILTER through every TYP, LFO and FX pages) is
+  pixel-identical but for the DAC FILTER screens with TYP OFF, LP1 and HP1, where FRQ/RES and RES
+  are empty as intended. RES's knob does nothing on LP1, FRQ's and RES's nothing on OFF, and the
+  page follows a switch from BD (LP1) to SD (OFF) and back.
+- Hardware, Analog Rytm MKII OS 1.74, 2026-10-23, V6A4 plus the analoghealth test mod for remote
+  keys (V6A4 rebuilt byte for byte with it; analoghealth hooks none of core 0.6's or the mods'
+  sites): every test step passes. DAC FILTER through every TYP, the empty knobs inert, the page
+  following TRK + SD and back, RES kept across LP2, LP1 and LP2, the LFO RND, velocity, euclid and
+  COMP preview pages as on U4A4, and BD's DAC FILTER back as saved after SAVE KIT, a power cycle
+  and RELOAD. BD on LP2, LP1 and OFF: no dropouts, nothing audible. Not compared with a v1.3
+  recording.
 
 ### 1.3 on core-ar2 0.4
 
