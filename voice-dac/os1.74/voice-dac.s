@@ -189,6 +189,10 @@
         | index) and core_store_set(field, item, index, value) clobber
         | d0-d1/a0-a1 (vd_get, vd_put keep them).
         .extern core_store_get, core_store_set, vd_flt, vd_shp, vd_dac
+        | test build: FRQ as an LFO destination (core-ar2 0.8). vd_flfo is a
+        | 1-bit lockable field with "lfo": the DST menu lists it, and
+        | core_lfo_offset(track, vd_flfo) is the LFO's offset for FRQ.
+        .extern core_lfo_offset, vd_flfo
         | the live globals records, as core-ar2's GLOBAL_LIVE: slot k at
         | GLOBAL_LIVE + 228 k; vd_dac's index is that slot
         .equ    GLOBAL_LIVE,    0x413192ff
@@ -323,6 +327,52 @@ vs_alt:
         bsr.w   vs_body
         jmp     ALT_RESUME
 
+        | ------------------------------------------------------------------
+        | frq_lfo(d1 = entry, d2 = track) -> d1 with FRQ moved by the track's
+        | LFO when its destination is DAC FILTER FRQ: the offset is in 8.8
+        | steps of a 0..127 knob, so FRQ moves by its integer part (a
+        | semitone a step), clamped to 0..127. A slot with TYP OFF is left
+        | alone. Keeps every register but d1.
+        | ------------------------------------------------------------------
+        .align  2
+frq_lfo:
+        cmp.l   #1 << 24,%d1
+        bcs.s   9f                                | TYP OFF
+        lea     -12(%sp),%sp
+        movem.l %d0/%a0-%a1,(%sp)
+        move.l  %d1,-(%sp)                        | the entry
+        pea     vd_flfo
+        move.l  %d2,-(%sp)
+        jsr     core_lfo_offset
+        addq.l  #8,%sp
+        move.l  (%sp)+,%d1
+        asr.l   #8,%d0                            | whole FRQ steps
+        beq.s   8f
+        move.l  %d1,-(%sp)
+        swap    %d1
+        and.l   #0xff,%d1                         | FRQ
+        add.l   %d0,%d1
+        bpl.s   1f
+        moveq   #0,%d1
+1:      cmp.l   #FRQ_MAX,%d1
+        ble.s   2f
+        move.l  #FRQ_MAX,%d1
+2:      swap    %d1
+        move.l  (%sp)+,%d0
+        and.l   #0xff00ffff,%d0
+        or.l    %d0,%d1
+8:      movem.l (%sp),%d0/%a0-%a1
+        lea     12(%sp),%sp
+9:      rts
+
+        .globl  voice_dac_lfo_param
+voice_dac_lfo_param:                              | core_lock_params
+        .long   vd_flfo, 0
+        .word   0, 1
+        .long   txt_lfo_short, txt_lfo_long
+txt_lfo_short: .asciz "DFRQ"
+txt_lfo_long:  .asciz "DAC FILTER FRQ"
+
         .align  2
 vs_body:
         .if     P_TIMING
@@ -360,6 +410,7 @@ vs_body:
         lsr.l   #1,%d0                            | slot * 4
         mvz.b   (%a0,%d5.l),%d2                   | owning track
         move.l  (%a5,%d2.l*4),%d1                 | its filter entry
+        bsr.w   frq_lfo                           | FRQ plus the LFO's offset
         move.l  %d1,ENT-COEF(%a4,%d0.l)
         moveq   #0,%d0
         moveq   #0,%d1
