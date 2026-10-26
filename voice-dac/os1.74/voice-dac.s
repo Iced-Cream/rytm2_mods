@@ -380,9 +380,10 @@ frq_lfo:
 voice_dac_lfo_param:                              | core_lock_params
         .long   vd_flfo, 0
         .word   0, 1
-        .long   txt_lfo_short, txt_lfo_long
+        .long   txt_lfo_short, txt_lfo_long, txt_lfo_cat
 txt_lfo_short: .asciz "DFRQ"
-txt_lfo_long:  .asciz "DAC FILTER FRQ"
+txt_lfo_long:  .asciz "Filter Freq"
+txt_lfo_cat:   .asciz "DAC"
 
         .align  2
 vs_body:
