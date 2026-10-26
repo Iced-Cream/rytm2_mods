@@ -328,42 +328,53 @@ vs_alt:
         jmp     ALT_RESUME
 
         | ------------------------------------------------------------------
-        | frq_lfo(d1 = entry, d2 = track) -> d1 with FRQ moved by the track's
-        | LFO when its destination is DAC FILTER FRQ: the offset is in 8.8
-        | steps of a 0..127 knob, so FRQ moves by its integer part (a
-        | semitone a step), clamped to 0..127. A slot with TYP OFF is left
-        | alone. Keeps every register but d1.
+        | frq_lfo(d0 = slot * 4, d1 = entry, d2 = track) -> d1 with FRQ moved
+        | by the track's LFO when its destination is DAC FILTER FRQ. The
+        | offset is in 8.8 steps of a 0..127 knob: FRQ takes its whole part,
+        | clamped to 0..127, and the slot's frq_frac its fraction, by which
+        | the coefficient pass interpolates between FRQ and FRQ + 1 (0 at
+        | 127). A slot with TYP OFF is left alone. Keeps every register but
+        | d1.
         | ------------------------------------------------------------------
         .align  2
 frq_lfo:
-        cmp.l   #1 << 24,%d1
-        bcs.s   9f                                | TYP OFF
         lea     -12(%sp),%sp
         movem.l %d0/%a0-%a1,(%sp)
+        lsr.l   #2,%d0
+        lea     frq_frac,%a0
+        clr.b   (%a0,%d0.l)                       | no fraction unless set below
+        cmp.l   #1 << 24,%d1
+        bcs.s   8f                                | TYP OFF
         move.l  %d1,-(%sp)                        | the entry
         pea     vd_flfo
         move.l  %d2,-(%sp)
         jsr     core_lfo_offset
         addq.l  #8,%sp
         move.l  (%sp)+,%d1
-        asr.l   #8,%d0                            | whole FRQ steps
+        tst.l   %d0
         beq.s   8f
-        move.l  %d1,-(%sp)
+        move.l  %d1,%a1                           | the entry
         swap    %d1
-        and.l   #0xff,%d1                         | FRQ
+        and.l   #0xff,%d1
+        lsl.l   #8,%d1                            | FRQ, 8.8
         add.l   %d0,%d1
         bpl.s   1f
         moveq   #0,%d1
-1:      cmp.l   #FRQ_MAX,%d1
+1:      cmp.l   #FRQ_MAX << 8,%d1
         ble.s   2f
-        move.l  #FRQ_MAX,%d1
-2:      swap    %d1
-        move.l  (%sp)+,%d0
+        move.l  #FRQ_MAX << 8,%d1
+2:      move.l  (%sp),%d0
+        lsr.l   #2,%d0                            | the slot
+        lea     frq_frac,%a0                      | (the call clobbered a0)
+        move.b  %d1,(%a0,%d0.l)                   | its fraction
+        lsr.l   #8,%d1
+        swap    %d1                               | FRQ << 16
+        move.l  %a1,%d0
         and.l   #0xff00ffff,%d0
         or.l    %d0,%d1
 8:      movem.l (%sp),%d0/%a0-%a1
         lea     12(%sp),%sp
-9:      rts
+        rts
 
         .globl  voice_dac_lfo_param
 voice_dac_lfo_param:                              | core_lock_params
@@ -474,7 +485,17 @@ vs_body:
         lea     flt_gain,%a1
         moveq   #7,%d7
 13:     move.l  (%a6)+,%d5                        | TYP << 24 | FRQ << 16 | DEP << 8 | RES
-        cmp.l   (%a3),%d5
+        moveq   #7,%d0
+        sub.l   %d7,%d0                           | the slot
+        lea     frq_frac,%a0
+        mvz.b   (%a0,%d0.l),%d1                   | its FRQ fraction (frq_lfo)
+        lea     flt_kfrac,%a0
+        mvz.b   (%a0,%d0.l),%d2
+        cmp.l   %d1,%d2
+        beq.s   24f
+        move.b  %d1,(%a0,%d0.l)                   | moved: worked out again
+        bra.s   20f
+24:     cmp.l   (%a3),%d5
         bne.s   20f
         lea     12(%a5),%a5                       | unchanged: as last block
         addq.l  #4,%a3
@@ -503,6 +524,17 @@ vs_body:
 21:     move.l  %d4,%d2
         and.l   #0xff,%d2                         | FRQ
         move.l  (%a2,%d2.l*4),%d6                 | p
+        moveq   #7,%d0
+        sub.l   %d7,%d0
+        lea     frq_frac,%a0
+        mvz.b   (%a0,%d0.l),%d0
+        beq.s   25f
+        move.l  4(%a2,%d2.l*4),%d1                | p at FRQ + 1
+        sub.l   %d6,%d1
+        asr.l   #8,%d1
+        muls.l  %d0,%d1
+        add.l   %d1,%d6                           | p, interpolated by the fraction
+25:
         mvz.w   (%a1,%d3.l*2),%d1
         swap    %d1                               | g, Q31
         move.l  #0x7fffffff,%d0
@@ -1570,6 +1602,13 @@ flt_key:
         .rept   8
         .long   -1
         .endr
+        | test build: per slot, the FRQ fraction frq_lfo leaves (0..255), and
+        | the one its coefficients were worked out with
+frq_frac:
+        .space  8
+flt_kfrac:
+        .space  8
+        .align  2
 hpf_state:
         .rept   8
         .long   0, 0                              | x1, y1, per slot
@@ -1629,6 +1668,22 @@ bq_coef:
         move.l  (%a0,%d3.l*4),%d6                 | c, Q31
         lea     bq_sin,%a0
         move.l  (%a0,%d3.l*4),%d2                 | s, Q31
+        lea     frq_frac,%a0
+        mvz.b   (%a0,%d7.l),%d0                   | the slot's FRQ fraction
+        beq.s   9f
+        lea     bq_cos,%a0
+        move.l  4(%a0,%d3.l*4),%d1
+        sub.l   %d6,%d1
+        asr.l   #8,%d1
+        muls.l  %d0,%d1
+        add.l   %d1,%d6                           | c, interpolated
+        lea     bq_sin,%a0
+        move.l  4(%a0,%d3.l*4),%d1
+        sub.l   %d2,%d1
+        asr.l   #8,%d1
+        muls.l  %d0,%d1
+        add.l   %d1,%d2                           | s, interpolated
+9:
         lea     bq_kq_lh,%a0
         cmp.l   #TYP_LP2,%d4
         beq.s   1f
