@@ -6,14 +6,31 @@
         | Mod 0004 - LFO RND. Phase 1: page, editing, dial, popup, storage.
         | Phase 2: the modifiers are applied.
         |
-        | The four settings are one 16-bit field in core-ar2 0.2's mod storage,
-        | lfo_rnd_cfg, sound scope (the live sound's spare bytes, saved in the
-        | stored sound's spare slots with core's layout ID):
+        | The four settings are four 4-bit sound fields in core-ar2's mod
+        | storage (the live sound's spare bytes, saved in the stored sound's
+        | spare slots with core's layout ID), each a lockable parameter
+        | (core-ar2 0.8/0.9; elemod 1.3, was one 16-bit field, lfo_rnd_cfg):
         |
-        |   bits 0..3   R1 DST   index into dst_indices
-        |   bits 4..7   R1 DEP   index into shared_amounts
+        |   lfo_rnd_ds1   R1 DST   index into dst_indices   lockable, not smoothed
+        |   lfo_rnd_dp1   R1 DEP   index into shared_amounts  lockable, not
+        |                          smoothed, LFO, velocity and aftertouch destination
+        |   lfo_rnd_ds2   R2 DST
+        |   lfo_rnd_dp2   R2 DEP
+        |
+        | Inside the mod they still travel as one packed word, as before:
+        |
+        |   bits 0..3   R1 DST
+        |   bits 4..7   R1 DEP
         |   bits 8..11  R2 DST
         |   bits 12..15 R2 DEP
+        |
+        | word_of packs the four fields and set_field writes all four back, so
+        | the page code is unchanged. At a note's start the audio interrupt
+        | takes each setting as core plays it (core_param_int: the sound's
+        | value, or the trig's p-lock, the scene's lock, plus the performances,
+        | the LFO and the velocity and aftertouch routes), so the settings can
+        | be p-locked, scene-locked, reached over MIDI and modulated (elemod
+        | 1.3, needs core-ar2 0.9).
         |
         | Parameter ids 1..4 are dead Error records, renamed by registry patches.
         | Field = id - 1, so the nibble shift is field * 4 and odd fields are depths.
@@ -43,7 +60,8 @@
         .equ    VT_CONFIG_CHANGED, 16             | the sound accessor's change notice
         .equ    SOUND_CONFIG_CHANGED, 0x401cb5dc  | SoundConfigChangedInfo's vtable
 
-        .extern core_store_get, core_store_set, lfo_rnd_cfg
+        .extern core_store_get, core_store_set, core_param_int
+        .extern lfo_rnd_ds1, lfo_rnd_dp1, lfo_rnd_ds2, lfo_rnd_dp2
 
         .text
 
@@ -63,25 +81,71 @@
         | ------------------------------------------------------------------
         | word_of(a0 = a live sound) -> d0 = its packed word
         |
-        | core's field, lfo_rnd_cfg; while that is 0, the word lfo-rnd 1.0 kept in
-        | the sound's parameter word 0, so a sound saved by it keeps its settings
-        | until the first edit moves them into the field. A stock sound has 0 there
-        | too. Keeps a0; clobbers d0/d1/a1. Safe in any context (the sequencer
-        | interrupt calls it): core_store_get masks interrupts for its loop.
+        | core's four fields, packed (elemod 1.3); while they are all 0, the word
+        | lfo-rnd 1.0 kept in the sound's parameter word 0, so a sound saved by it
+        | keeps its settings until the first edit moves them into the fields. A
+        | stock sound has 0 there too. Keeps a0; clobbers d0/d1/a0/a1. Safe in any
+        | context (the sequencer interrupt calls it): core_store_get masks
+        | interrupts for its loop.
         | ------------------------------------------------------------------
         .align  2
 word_of:
-        move.l  %a0,-(%sp)
-        clr.l   -(%sp)                            | index, unused for a sound
-        move.l  %a0,-(%sp)                        | item: the live sound
-        move.l  #lfo_rnd_cfg,-(%sp)               | the field's descriptor, absolute
+        lea     -12(%sp),%sp
+        movem.l %d2-%d3/%a2,(%sp)
+        move.l  %a0,%a2                           | the live sound
+        clr.l   %d2                               | the packed word
+        lea     fields_hi,%a0
+        moveq   #3,%d3                            | field 3 (R2 DEP) first
+1:      clr.l   -(%sp)                            | index, unused for a sound
+        move.l  %a2,-(%sp)                        | item: the live sound
+        move.l  (%a0,%d3.l*4),-(%sp)              | the field's descriptor
         jsr     core_store_get
         lea     12(%sp),%sp
-        move.l  (%sp)+,%a0
-        tst.l   %d0
-        bne.s   1f
-        mvzw    OFF_PARAMS(%a0),%d0               | lfo-rnd 1.0's word, or stock's 0
-1:      rts
+        lsl.l   #4,%d2
+        moveq   #15,%d1
+        and.l   %d1,%d0
+        or.l    %d0,%d2
+        lea     fields_hi,%a0
+        subq.l  #1,%d3
+        bpl.s   1b
+        move.l  %d2,%d0
+        bne.s   2f
+        mvzw    OFF_PARAMS(%a2),%d0               | lfo-rnd 1.0's word, or stock's 0
+2:      move.l  %a2,%a0
+        movem.l (%sp),%d2-%d3/%a2
+        lea     12(%sp),%sp
+        rts
+
+        | ------------------------------------------------------------------
+        | put_word(a0 = a live sound, d0 = a packed word): the word's four
+        | settings into core's four fields (elemod 1.3). Keeps a0; clobbers
+        | d0/d1/a1.
+        | ------------------------------------------------------------------
+        .align  2
+put_word:
+        lea     -12(%sp),%sp
+        movem.l %d2-%d3/%a2,(%sp)
+        move.l  %a0,%a2
+        move.l  %d0,%d2
+        clr.l   %d3                               | field 0 (R1 DST) first
+1:      moveq   #15,%d0
+        and.l   %d2,%d0
+        move.l  %d0,-(%sp)                        | value
+        clr.l   -(%sp)                            | index
+        move.l  %a2,-(%sp)                        | item: the live sound
+        lea     fields_hi,%a0
+        move.l  (%a0,%d3.l*4),-(%sp)              | the field's descriptor
+        jsr     core_store_set
+        lea     16(%sp),%sp
+        lsr.l   #4,%d2
+        addq.l  #1,%d3
+        moveq   #4,%d0
+        cmp.l   %d0,%d3
+        bne.s   1b
+        move.l  %a2,%a0
+        movem.l (%sp),%d2-%d3/%a2
+        lea     12(%sp),%sp
+        rts
 
         | ------------------------------------------------------------------
         | notify() - the change notice stock's sound settings setters send
@@ -376,12 +440,8 @@ set_field:
         clr.w   OFF_PARAMS(%a0)                   | lfo-rnd 1.0's word: now the field's
         moveq   #2,%d1
 1:      move.l  %d1,8(%sp)                        | the answer, over the setting
-        move.l  %d2,-(%sp)                        | value
-        clr.l   -(%sp)                            | index
-        move.l  %a0,-(%sp)                        | item: the live sound
-        move.l  #lfo_rnd_cfg,-(%sp)               | the field's descriptor, absolute
-        jsr     core_store_set
-        lea     16(%sp),%sp
+        move.l  %d2,%d0                           | the new packed word
+        bsr.w   put_word                          | elemod 1.3: into the four fields
         move.l  %d2,%d0                           | the new packed word
         move.l  8(%sp),%d1
         move.l  4(%sp),%d2
@@ -686,6 +746,46 @@ trig_cfg_gate:
         | and the array wants it in 8.8, so the shift happens on the way out. The
         | destination is an index into the sound's 42 parameters, so it is a byte too.
         | ------------------------------------------------------------------
+        | ------------------------------------------------------------------
+        | eff_word(d2 = track) -> d0 = the track's packed word as core plays it
+        | (elemod 1.3): each setting is core_param_int of its field, so a
+        | p-lock, a scene lock, the performances, the LFO and the velocity and
+        | aftertouch routes count, clamped to 0..15 by core. While all four
+        | come back 0, the word trig_fire kept in cfg, which carries lfo-rnd
+        | 1.0's word for a sound saved by it. Keeps every register but d0.
+        | ------------------------------------------------------------------
+        .align  2
+eff_word:
+        lea     -24(%sp),%sp
+        movem.l %d1-%d4/%a0-%a1,(%sp)
+        clr.l   %d4                               | the packed word
+        moveq   #3,%d3                            | field 3 (R2 DEP) first
+1:      lea     fields_hi,%a0
+        move.l  (%a0,%d3.l*4),-(%sp)              | the field's descriptor
+        move.l  %d2,-(%sp)                        | the track
+        jsr     core_param_int
+        addq.l  #8,%sp
+        tst.l   %d0
+        bpl.s   2f
+        clr.l   %d0                               | CORE_PARAM_NONE: no code
+2:      moveq   #15,%d1
+        cmp.l   %d1,%d0
+        ble.s   3f
+        move.l  %d1,%d0
+3:      lsl.l   #4,%d4
+        or.l    %d0,%d4
+        subq.l  #1,%d3
+        bpl.s   1b
+        move.l  %d4,%d0
+        bne.s   9f
+        lea     cfg,%a0
+        move.l  %d2,%d1
+        add.l   %d1,%d1
+        mvzw    %a0@(0,%d1:l),%d0                 | settings word, from trig_fire
+9:      movem.l (%sp),%d1-%d4/%a0-%a1
+        lea     24(%sp),%sp
+        rts
+
         .align  2
         .globl  lfo_rnd_audio_gate
 lfo_rnd_audio_gate:
@@ -700,10 +800,8 @@ audio_gate:
         bne.s   5f
 
         | a note started: redraw both offsets from the track's settings
-        lea     cfg,%a0
-        move.l  %d2,%d0
-        add.l   %d0,%d0
-        mvzw    %a0@(0,%d0:l),%d3                 | settings word
+        bsr.w   eff_word                          | elemod 1.3: as core plays them
+        move.l  %d0,%d3                           | settings word
         moveq   #2,%d5                            | modifiers left
 2:      moveq   #15,%d0
         and.l   %d3,%d0                           | destination position
@@ -789,6 +887,31 @@ dst_indices:
         .byte   18, 21, 30, 31, 35, 38, 40, 41
 
 
+        | the four fields' descriptors, in packed order (elemod 1.3)
+        .align  2
+fields_hi:
+        .long   lfo_rnd_ds1, lfo_rnd_dp1, lfo_rnd_ds2, lfo_rnd_dp2
+
+        | core_lock_params (elemod 1.3): {field, knob id, min, max, short
+        | name, name, category}, ids 1..4 the page's knobs
+        .globl  lfo_rnd_lock_ds1, lfo_rnd_lock_dp1, lfo_rnd_lock_ds2, lfo_rnd_lock_dp2
+lfo_rnd_lock_ds1:
+        .long   lfo_rnd_ds1, ID_FIRST
+        .word   0, 15
+        .long   str_r1dst, str_r1dst_l, str_cat
+lfo_rnd_lock_dp1:
+        .long   lfo_rnd_dp1, ID_FIRST+1
+        .word   0, 15
+        .long   str_r1dep, str_r1dep_l, str_cat
+lfo_rnd_lock_ds2:
+        .long   lfo_rnd_ds2, ID_FIRST+2
+        .word   0, 15
+        .long   str_r2dst, str_r2dst_l, str_cat
+lfo_rnd_lock_dp2:
+        .long   lfo_rnd_dp2, ID_FIRST+3
+        .word   0, 15
+        .long   str_r2dep, str_r2dep_l, str_cat
+
         .if     P_PHASE >= 2
         .align  2
 rng_state:      .long   0x6c8e9cf5                | the draw itself is 0000-shared's
@@ -798,6 +921,7 @@ held:           .space  4*VOICE_TRACKS            | {dst, offset} bytes, x2 per 
 
 
 str_none:       .asciz  "--"
+str_cat:        .asciz  "RND"                     | elemod 1.3: the parameters' category
         .globl  lfo_rnd_str_r1dst_l
 lfo_rnd_str_r1dst_l:
 str_r1dst_l:    .asciz  "Random 1 Dest"
