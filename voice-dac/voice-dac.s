@@ -211,7 +211,7 @@
         .equ    P_RR_DIV,       4                 | a track refreshed in turn every 4 blocks (a power of 2)
         .endif
         .ifndef P_FRQ_DIV
-        .equ    P_FRQ_DIV,      2                 | each track's FRQ read every 2 blocks (a power of 2)
+        .equ    P_FRQ_DIV,      4                 | each track's FRQ read every 4 blocks, 375 a second (a power of 2)
         .endif
         .ifndef P_TRIG_N
         .equ    P_TRIG_N,       2                 | note refreshes a block (mod_pass)
@@ -365,14 +365,16 @@ vs_alt:
         | reads cost a few hundred timer ticks each (core-ar2 0.10: about 0.86%
         | of a block one at a time, 0.37% a read in one core_param_values
         | call), so not every value is read every block:
-        |   - FRQ every block, for each track that owns a voice and has its
-        |     filter on, with its fraction (core_param_value_h);
+        |   - FRQ every P_FRQ_DIV blocks (4: 375 a second), the tracks
+        |     staggered, for each track that owns a voice and has its filter
+        |     on, with its fraction (core_param_value_h);
         |   - the rest (TYP, RES, DEP, ATK, SUS, POL, and FRQ) on a note:
         |     tracks whose TRIG_FLAGS say a note started join mod_pend, and
         |     up to P_TRIG_N of them a block are read, so a trig's p-locks
         |     play on its note;
-        |   - and one track a block in turn, for scenes, performances, the
-        |     LFO and the routes between notes, and edits.
+        |   - and one track that owns a voice every P_RR_DIV blocks (4), in
+        |     turn, for scenes, performances, the LFO and the routes between
+        |     notes, and edits.
         | A field core gives no value for (CORE_PARAM_NONE) leaves the idle
         | tick's copy, hpf_track and shp_track. Keeps every register.
         | ------------------------------------------------------------------
