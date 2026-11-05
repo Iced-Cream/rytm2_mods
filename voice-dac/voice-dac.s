@@ -207,6 +207,12 @@
         .ifndef P_MODPASS
         .equ    P_MODPASS,      1                 | 0: no mod_pass (the idle tick's values only; a cost probe)
         .endif
+        .ifndef P_RR_DIV
+        .equ    P_RR_DIV,       4                 | a track refreshed in turn every 4 blocks (a power of 2)
+        .endif
+        .ifndef P_FRQ_DIV
+        .equ    P_FRQ_DIV,      2                 | each track's FRQ read every 2 blocks (a power of 2)
+        .endif
         .ifndef P_TRIG_N
         .equ    P_TRIG_N,       2                 | note refreshes a block (mod_pass)
         .endif
@@ -411,23 +417,40 @@ mod_pass:
         subq.l  #1,%d4
         bra.s   4b
 6:      move.l  %d6,mod_pend
-        move.l  mod_rr,%d2                        | one track in turn
-        addq.l  #1,%d2
+        move.l  mod_blk,%d3                       | the block count, for the dividers
+        addq.l  #1,%d3
+        move.l  %d3,mod_blk
+        moveq   #P_RR_DIV-1,%d0
+        and.l   %d3,%d0
+        bne.s   8f                                | not a refresh block
+        move.l  mod_rr,%d2                        | the next track that owns a voice
+        moveq   #VOICE_TRACKS,%d1                 | (one lap at most)
+70:     addq.l  #1,%d2
         moveq   #VOICE_TRACKS,%d0
         cmp.l   %d0,%d2
-        blt.s   7f
+        blt.s   71f
         moveq   #0,%d2
-7:      move.l  %d2,mod_rr
+71:     btst    %d2,%d7
+        bne.s   72f
+        subq.l  #1,%d1
+        bne.s   70b
+        bra.s   8f                                | no track owns a voice
+72:     move.l  %d2,mod_rr
         btst    %d2,%d5
         bne.s   8f
         bset    %d2,%d5
         bsr.w   mod_full
-8:      moveq   #0,%d2                            | FRQ: every block
+8:      moveq   #0,%d2                            | FRQ: every P_FRQ_DIV blocks, tracks staggered
         lea     hpf_mod,%a2
 81:     btst    %d2,%d7
         beq.s   82f                               | no voice
         btst    %d2,%d5
         bne.s   82f                               | read in full above
+        move.l  %d2,%d0
+        add.l   %d3,%d0
+        moveq   #P_FRQ_DIV-1,%d1
+        and.l   %d1,%d0
+        bne.s   82f                               | not this track's block
         move.l  (%a2,%d2.l*4),%d0
         cmp.l   #1 << 24,%d0
         bcs.s   82f                               | TYP OFF
@@ -2006,6 +2029,8 @@ mod_pend:
         .long   0                                 | tracks with a note not yet refreshed
 mod_rr:
         .long   0                                 | the track refreshed in turn last
+mod_blk:
+        .long   0                                 | mod_pass's block count
         .align  2
 vd_hs:
         .space  4 * VD_NH                         | the handles (mod_handles), vd_hf's order
