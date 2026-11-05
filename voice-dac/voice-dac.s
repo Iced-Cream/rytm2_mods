@@ -204,6 +204,9 @@
         .ifndef P_MODPROF
         .equ    P_MODPROF,      0                 | 1: mod_pass's cost in DMA timer 0 ticks
         .endif
+        .ifndef P_MODPASS
+        .equ    P_MODPASS,      1                 | 0: no mod_pass (the idle tick's values only; a cost probe)
+        .endif
         .ifndef P_TRIG_N
         .equ    P_TRIG_N,       2                 | note refreshes a block (mod_pass)
         .endif
@@ -610,7 +613,18 @@ vs_body:
         move.l  DTCN0,%d0                         | profiling build only
         move.l  %d0,mp_t0
         .endif
+        .if     P_MODPASS
         bsr.w   mod_pass                          | elemod 1.5: the values core plays
+        .else
+        lea     hpf_track,%a0                     | probe build: the idle tick's values
+        lea     hpf_mod,%a1                       | (hpf_track, shp_track, shp_any) as
+        moveq   #2 * VOICE_TRACKS,%d0             | they are, no core reads
+1:      move.l  (%a0)+,(%a1)+
+        subq.l  #1,%d0
+        bne.s   1b
+        move.l  shp_any,%d0
+        move.l  %d0,shp_mod_any
+        .endif
         .if     P_MODPROF
         move.l  DTCN0,%d0
         sub.l   mp_t0,%d0
