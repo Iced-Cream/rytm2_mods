@@ -109,6 +109,42 @@ table is a `ptr` site.
 
 ## Changes from rytm-mods
 
+### 1.5: DAC FILTER's knobs as core-ar2 parameters (core 0.10)
+
+Each DAC FILTER knob is now a sound field and a lockable parameter of its own, registered in
+`core_lock_params` on its page knob: `vd_typ` (3 bits), `vd_frq` (7, init 127), `vd_dep` (7, init
+127), `vd_res` (7), `vd_atk` and `vd_sus` (7, init 64, so 64 is the centre) and `vd_pol` (1).
+All seven can be p-locked, scene-locked, given a performance depth and reached over MIDI (NRPN,
+and CCs from stock's unused ones). FRQ, RES, DEP, ATK and SUS are also LFO, velocity and
+aftertouch destinations, smoothed as stock's knobs; TYP and POL step. Core 0.10's field inits keep
+1.4's defaults (TYP OFF, FRQ 127, DEP FULL, RES 0, ATK and SUS 0, POL +). Needs core-ar2 0.10
+(`"resources": {"core": "0.10"}`).
+
+- The audio interrupt takes each track's values as core plays them (the sound's, a trig's p-lock
+  or a scene's lock, smoothed, plus performances, LFO and routes) in place of the idle tick's
+  copy. FRQ keeps its fraction, and the coefficients interpolate between FRQ steps.
+- `mod_pass` reads through core 0.10's handles: `core_param_handle` once for each field, then one
+  `core_param_values` call a track for all its fields, and `core_param_value_h` for FRQ alone.
+- It does not read every block. Each voice track's FRQ is read every 4 blocks (`P_FRQ_DIV`, 375 a
+  second, the tracks staggered), and one voice track's full set in turn every 4 blocks
+  (`P_RR_DIV`). A track with TYP OFF skips the FRQ read. Reading everything every block cost
+  about 3.5% of a block on a unit and hung it with eight voices on LP2 under an LFO (below).
+- With a pad held, the popups (FRQ, RES, TYP, DEP, ATK, SUS, POL) and TYP's glyph show the value
+  core passes: a trig's lock, a scene's lock or a performance's depth. 1.2-1.4 read them from the
+  sound, so a lock being edited read as the sound's value. The FRQ graph, and the PK test for
+  DEP's text, still read the sound.
+- `P_MODPROF` (0) builds a probe that times `mod_pass` in DMA timer 0 ticks, and `P_MODPASS 0`
+  one that skips it (the idle tick's values only). Both are for measuring; the default build has
+  neither.
+- **Settings saved by 1.2-1.4** (the fields `vd_flt` and `vd_shp`) load as the defaults: set
+  DAC FILTER again on those sounds. DAC SUM (`vd_dac`) is unchanged and keeps its value.
+
+`voice-dac-nodep/` builds 1.5-nodep from the same source with `P_DEP 0`: no DEP knob (its slot
+empty, the filter always FULL) and no `vd_dep` field, so it takes 32 sound bits in place of 39.
+A build with LFO destinations leaves mods 49 sound bits, so voice-dac 1.5 (39) and lfo-rnd 1.3
+(16) cannot share one; 1.5-nodep and lfo-rnd can. The other fields keep their names, so a sound
+moves between the two with its settings, DEP aside.
+
 ### 1.4: DAC FILTER's knobs follow TYP (rytm-mods-src 3a98e23)
 
 MrScruff's update: with TYP LP1 or HP1, RES's slot on DAC FILTER is empty (no dial, no label, the
@@ -160,6 +196,47 @@ with core 0.4 (their sites overlap core's), and 1.3 does not link with core 0.3.
 10. (1.4) BD on LP1, SD on OFF: TRK + SD, then TRK + BD, on DAC FILTER: the page changes with the track.
 
 ## Results so far
+
+### 1.5 on core-ar2 0.10
+
+- Built and linked on irpina/elekloader main 7d0bf15 (core 0.10, #255): 1.5-nodep with the other
+  ten mods (55 of 56 sound bits); 1.5 with the other nine but lfo-rnd. 1.5 with lfo-rnd 1.3 is
+  refused at 62 bits, as expected.
+- rytm-emu, OS 1.74: the field inits read as 1.4's defaults, the CCs move the knobs, and an LFO
+  on DAC FRQ moves the filter.
+- Hardware, Analog Rytm MKII OS 1.74, 2026-11-05/06, core 0.10 with all eleven mods (1.5-nodep
+  with the `P_MODPROF` probe) and the analoghealth test mod, against the same build with
+  voice-dac 1.4 and lfo-rnd 1.2:
+  - Reading every block (the first 1.5): `mod_pass` 3.4% of a block idle, 3.5% with notes, and with
+    eight voices on LP2 under an LFO on DAC FRQ the unit stopped answering and needed a power
+    cycle.
+  - The default reads (FRQ every 4 blocks, one track's full set every 4): `mod_pass` 1.40% of a
+    block idle, 1.46% with notes, 3.08% with eight voices on LP2 under the LFO. No hang. CPU 82%
+    idle against 80% for 1.4.
+  - Most of the CPU load is the stock OS's: about 75% idle and 90% with notes on 8 voices with core
+    0.10 and no mods.
+  - Listening: a SY DUAL VCO note held for the bar, LP2 FRQ 64 RES 70, an LFO sweeping DAC FRQ
+    over the whole range once a bar: the sweep sounds smooth, with no audible stepping from
+    the 375-a-second FRQ reads.
+- Hardware, 2026-11-06, unit checks read from voice-dac's tables (rcheck.py, every read judged
+  against an expected value):
+  - 1.5-nodep in the all-eleven build: TYP OFF..PK and POL by CC, FRQ by CC 51, a VELOCITY MOD
+    route to DAC FRQ (velocity 1, 64, 127 give FRQ 10, 73, 127 from a base of 10), an AFTERTOUCH
+    route (0, 64, 127, 0 give 10, 74, 127, 10), a scene lock on FRQ (on 127, off back to 20), and
+    FRQ/TYP/POL kept through a kit save, a power cycle, KIT RELOAD and a power cycle without a kit
+    save. A FRQ p-lock on step 1 plays from the second loop; see the known limit below.
+  - 1.5 with DEP: the defaults on a new sound on every voice track, DEP 0 and 127 at the knob's
+    ends and 64 by CC 9 (the 0.0dB and FULL popups shown), the LP1 and HP1 shelves (at DEP 64,
+    -16.00 dB at Nyquist for LP1 and at DC for HP1; 0 at DEP FULL; the slot off at DEP 0; one pole
+    for FRQ 60 throughout), and an LFO on DAC DEP sweeping DEP over 0..127.
+- Known limit (core, not this mod): a p-lock on step 1 made or changed while stopped plays from
+  the second loop after PLAY. With BD step 1 locked to FRQ 127 over a sound FRQ of 40, FRQ reads
+  40 for the first loop and 127 from the second. A lock on a later step plays on the first loop,
+  and a STOP or any stock edit on the track after the lock fixes it. Stock prepares step 1 when
+  stopped and on its own edits, and core's lock writes don't ask it to prepare it again. Seen on
+  the unit and in rytm-emu, and the same with lfo-rnd's DP1. A core-ar2 handover is written.
+- Not yet on a unit: the steps of Test above by hand (the unit checks cover their values, not the
+  screens), and DEP with lfo-rnd in one build (it does not fit).
 
 ### 1.4 on core-ar2 0.6
 

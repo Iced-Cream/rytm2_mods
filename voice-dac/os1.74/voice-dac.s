@@ -188,7 +188,43 @@
         | absolute symbols elekloader defines; core_store_get(field, item,
         | index) and core_store_set(field, item, index, value) clobber
         | d0-d1/a0-a1 (vd_get, vd_put keep them).
-        .extern core_store_get, core_store_set, vd_flt, vd_shp, vd_dac
+        .extern core_store_get, core_store_set, vd_dac
+        | elemod 1.5 (core-ar2 0.9 and 0.10): each knob is a sound field of
+        | its own and a lockable parameter (core_lock_params, below): vd_typ
+        | (3 bits), vd_frq (7, init 127), vd_dep (7, init 127; not in the
+        | build without DEP, P_DEP 0), vd_res (7), vd_atk and vd_sus (7, init
+        | 64, the centre: the value + 64) and vd_pol (1). The inits are core
+        | 0.10's, so a cleared field reads the default, as 1.2-1.4's flipped
+        | values did. The page code still reads and writes the two words 1.4
+        | kept, VD_FLT and VD_SHP below: vd_get and vd_put pack and unpack
+        | them from the fields.
+        .extern vd_typ, vd_frq, vd_res, vd_atk, vd_sus, vd_pol
+        .extern core_param_handle, core_param_value_h, core_param_values
+        .equ    TRIG_FLAGS,     0x8000e508        | per track, a long: 1 on a note this block
+        .ifndef P_MODPROF
+        .equ    P_MODPROF,      0                 | 1: mod_pass's cost in DMA timer 0 ticks
+        .endif
+        .ifndef P_MODPASS
+        .equ    P_MODPASS,      1                 | 0: no mod_pass (the idle tick's values only; a cost probe)
+        .endif
+        .ifndef P_RR_DIV
+        .equ    P_RR_DIV,       4                 | a track refreshed in turn every 4 blocks (a power of 2)
+        .endif
+        .ifndef P_FRQ_DIV
+        .equ    P_FRQ_DIV,      4                 | each track's FRQ read every 4 blocks, 375 a second (a power of 2)
+        .endif
+        .ifndef P_TRIG_N
+        .equ    P_TRIG_N,       2                 | note refreshes a block (mod_pass)
+        .endif
+        .ifndef P_DEP
+        .equ    P_DEP, 1                          | 0: the build without DEP
+        .endif
+        .equ    VD_NH,          6 + P_DEP         | the fields mod_full reads
+        .if     P_DEP
+        .extern vd_dep
+        .endif
+        .equ    VD_FLT,         1                 | 1.4's vd_flt word, packed from the fields
+        .equ    VD_SHP,         2                 | 1.4's vd_shp word
         | the live globals records, as core-ar2's GLOBAL_LIVE: slot k at
         | GLOBAL_LIVE + 228 k; vd_dac's index is that slot
         .equ    GLOBAL_LIVE,    0x413192ff
@@ -323,6 +359,265 @@ vs_alt:
         bsr.w   vs_body
         jmp     ALT_RESUME
 
+        | ------------------------------------------------------------------
+        | mod_pass (elemod 1.5): hpf_mod and shp_mod, each voice track's
+        | values as core plays them, from vs_body before the filter. Core's
+        | reads cost a few hundred timer ticks each (core-ar2 0.10: about 0.86%
+        | of a block one at a time, 0.37% a read in one core_param_values
+        | call), so not every value is read every block:
+        |   - FRQ every P_FRQ_DIV blocks (4: 375 a second), the tracks
+        |     staggered, for each track that owns a voice and has its filter
+        |     on, with its fraction (core_param_value_h);
+        |   - the rest (TYP, RES, DEP, ATK, SUS, POL, and FRQ) on a note:
+        |     tracks whose TRIG_FLAGS say a note started join mod_pend, and
+        |     up to P_TRIG_N of them a block are read, so a trig's p-locks
+        |     play on its note;
+        |   - and one track that owns a voice every P_RR_DIV blocks (4), in
+        |     turn, for scenes, performances, the LFO and the routes between
+        |     notes, and edits.
+        | A field core gives no value for (CORE_PARAM_NONE) leaves the idle
+        | tick's copy, hpf_track and shp_track. Keeps every register.
+        | ------------------------------------------------------------------
+        .align  2
+mod_pass:
+        lea     -44(%sp),%sp
+        movem.l %d2-%d7/%a2-%a6,(%sp)
+        bsr.w   mod_handles                       | the first call: vd_hs
+        lea     VOICE_OWNER,%a0                   | the tracks that own a voice
+        moveq   #0,%d7
+        moveq   #7,%d1
+1:      mvz.b   (%a0,%d1.l),%d0
+        bset    %d0,%d7
+        subq.l  #1,%d1
+        bpl.s   1b
+        lea     TRIG_FLAGS,%a0                    | notes this block join mod_pend
+        move.l  mod_pend,%d6
+        moveq   #0,%d1
+2:      moveq   #1,%d0
+        cmp.l   (%a0)+,%d0
+        bne.s   3f
+        bset    %d1,%d6
+3:      addq.l  #1,%d1
+        moveq   #VOICE_TRACKS,%d0
+        cmp.l   %d0,%d1
+        blt.s   2b
+        and.l   %d7,%d6
+        moveq   #0,%d5                            | the tracks read in full this block
+        moveq   #P_TRIG_N,%d4
+4:      tst.l   %d6
+        beq.s   6f
+        tst.l   %d4
+        beq.s   6f
+        moveq   #0,%d2                            | the lowest pending track
+5:      btst    %d2,%d6
+        bne.s   51f
+        addq.l  #1,%d2
+        bra.s   5b
+51:     bclr    %d2,%d6
+        bset    %d2,%d5
+        bsr.w   mod_full
+        subq.l  #1,%d4
+        bra.s   4b
+6:      move.l  %d6,mod_pend
+        move.l  mod_blk,%d3                       | the block count, for the dividers
+        addq.l  #1,%d3
+        move.l  %d3,mod_blk
+        moveq   #P_RR_DIV-1,%d0
+        and.l   %d3,%d0
+        bne.s   8f                                | not a refresh block
+        move.l  mod_rr,%d2                        | the next track that owns a voice
+        moveq   #VOICE_TRACKS,%d1                 | (one lap at most)
+70:     addq.l  #1,%d2
+        moveq   #VOICE_TRACKS,%d0
+        cmp.l   %d0,%d2
+        blt.s   71f
+        moveq   #0,%d2
+71:     btst    %d2,%d7
+        bne.s   72f
+        subq.l  #1,%d1
+        bne.s   70b
+        bra.s   8f                                | no track owns a voice
+72:     move.l  %d2,mod_rr
+        btst    %d2,%d5
+        bne.s   8f
+        bset    %d2,%d5
+        bsr.w   mod_full
+8:      moveq   #0,%d2                            | FRQ: every P_FRQ_DIV blocks, tracks staggered
+        lea     hpf_mod,%a2
+81:     btst    %d2,%d7
+        beq.s   82f                               | no voice
+        btst    %d2,%d5
+        bne.s   82f                               | read in full above
+        move.l  %d2,%d0
+        add.l   %d3,%d0
+        moveq   #P_FRQ_DIV-1,%d1
+        and.l   %d1,%d0
+        bne.s   82f                               | not this track's block
+        move.l  (%a2,%d2.l*4),%d0
+        cmp.l   #1 << 24,%d0
+        bcs.s   82f                               | TYP OFF
+        bsr.w   mod_frq
+82:     addq.l  #1,%d2
+        moveq   #VOICE_TRACKS,%d0
+        cmp.l   %d0,%d2
+        blt.s   81b
+        lea     shp_mod,%a0                       | shp_mod_any: any ATK or SUS
+        moveq   #0,%d0
+        moveq   #VOICE_TRACKS-1,%d1
+9:      or.l    (%a0)+,%d0
+        subq.l  #1,%d1
+        bpl.s   9b
+        and.l   #0xffff0000,%d0
+        move.l  %d0,shp_mod_any
+        movem.l (%sp),%d2-%d7/%a2-%a6
+        lea     44(%sp),%sp
+        rts
+
+        | mod_handles: vd_hs, the fields' handles (core_param_handle), looked
+        | up on mod_pass's first call. A handle is a lock code of the build's
+        | layout, so it holds until the next flash. Keeps d2-d7/a2-a6.
+        .align  2
+mod_handles:
+        tst.l   vd_hs_ok
+        bne.s   9f
+        lea     -8(%sp),%sp
+        movem.l %d2/%a2,(%sp)
+        moveq   #0,%d2
+1:      lea     vd_hf,%a2
+        move.l  (%a2,%d2.l*4),-(%sp)
+        jsr     core_param_handle
+        addq.l  #4,%sp
+        lea     vd_hs,%a2
+        move.l  %d0,(%a2,%d2.l*4)
+        addq.l  #1,%d2
+        moveq   #VD_NH,%d0
+        cmp.l   %d0,%d2
+        blt.s   1b
+        moveq   #1,%d0
+        move.l  %d0,vd_hs_ok
+        movem.l (%sp),%d2/%a2
+        lea     8(%sp),%sp
+9:      rts
+
+        | mod_full(d2 = track): the track's hpf_mod and shp_mod entries, every
+        | value read in one core_param_values call (the track's checks, the
+        | block's state and the sound found once). Keeps d2-d7/a2-a6.
+        .equ    MF_OUT,         8                 | out[VD_NH] on the stack
+        .equ    MF_SZ,          MF_OUT + 4 * VD_NH
+        .align  2
+mod_full:
+        lea     -MF_SZ(%sp),%sp
+        movem.l %d3/%a3,(%sp)
+        pea     MF_OUT(%sp)                       | out
+        clr.l   -(%sp)                            | flags
+        moveq   #VD_NH,%d0
+        move.l  %d0,-(%sp)                        | n
+        pea     vd_hs                             | handles
+        move.l  %d2,-(%sp)                        | track
+        jsr     core_param_values
+        lea     20(%sp),%sp
+        lea     MF_OUT(%sp),%a3
+        move.l  (%a3),%d0                         | TYP
+        bmi.w   90f                               | no value: the idle tick's
+        add.l   #0x80,%d0
+        asr.l   #8,%d0
+        moveq   #24,%d1
+        lsl.l   %d1,%d0
+        move.l  %d0,%d3                           | TYP << 24
+        .if     P_DEP
+        move.l  24(%a3),%d0                       | DEP
+        add.l   #0x80,%d0
+        asr.l   #8,%d0
+        .else
+        moveq   #DEP_FULL,%d0                     | without DEP: FULL
+        .endif
+        lsl.l   #8,%d0
+        or.l    %d0,%d3                           | DEP << 8
+        move.l  8(%a3),%d0                        | RES
+        add.l   #0x80,%d0
+        asr.l   #8,%d0
+        or.l    %d0,%d3                           | RES
+        move.l  4(%a3),%d0                        | FRQ, 8.8
+        bmi.s   1f
+        lea     mod_frac,%a0
+        move.b  %d0,(%a0,%d2.l)                   | its fraction
+        lsr.l   #8,%d0
+        and.l   #0xff,%d0
+        swap    %d0
+        bra.s   2f
+1:      lea     mod_frac,%a0                      | no value: the idle tick's
+        clr.b   (%a0,%d2.l)
+        lea     hpf_track,%a0
+        move.l  (%a0,%d2.l*4),%d0
+        and.l   #0x00ff0000,%d0
+2:      or.l    %d0,%d3                           | FRQ << 16
+        lea     hpf_mod,%a0
+        move.l  %d3,(%a0,%d2.l*4)
+        move.l  12(%a3),%d0                       | ATK
+        add.l   #0x80,%d0
+        asr.l   #8,%d0
+        sub.l   #0x40,%d0                         | the value - 64
+        moveq   #24,%d1
+        lsl.l   %d1,%d0
+        move.l  %d0,%d3                           | ATK << 24
+        move.l  16(%a3),%d0                       | SUS
+        add.l   #0x80,%d0
+        asr.l   #8,%d0
+        sub.l   #0x40,%d0
+        and.l   #0xff,%d0
+        swap    %d0
+        or.l    %d0,%d3                           | SUS << 16
+        move.l  20(%a3),%d0                       | POL
+        add.l   #0x80,%d0
+        asr.l   #8,%d0
+        moveq   #1,%d1
+        and.l   %d1,%d0
+        lsl.l   #8,%d0
+        or.l    %d0,%d3                           | POL << 8
+        lea     shp_mod,%a0
+        move.l  %d3,(%a0,%d2.l*4)
+        bra.s   99f
+90:     lea     hpf_track,%a3
+        move.l  (%a3,%d2.l*4),%d0
+        move.l  48(%a3,%d2.l*4),%d1               | shp_track
+        lea     hpf_mod,%a3
+        move.l  %d0,(%a3,%d2.l*4)
+        move.l  %d1,48(%a3,%d2.l*4)               | shp_mod
+        lea     mod_frac,%a3
+        clr.b   (%a3,%d2.l)
+99:     movem.l (%sp),%d3/%a3
+        lea     MF_SZ(%sp),%sp
+        rts
+
+        | mod_frq(d2 = track): FRQ into the track's hpf_mod entry, 8.8, by its
+        | handle: its whole steps in the entry, its fraction in mod_frac (0 at
+        | 127, core clamps there). Keeps d2-d7/a2-a6.
+        .align  2
+mod_frq:
+        clr.l   -(%sp)                            | flags
+        move.l  vd_hs+4,-(%sp)                    | FRQ's handle
+        move.l  %d2,-(%sp)
+        jsr     core_param_value_h
+        lea     12(%sp),%sp
+        tst.l   %d0
+        bmi.s   9f                                | no value
+        lea     mod_frac,%a0
+        move.b  %d0,(%a0,%d2.l)
+        lsr.l   #8,%d0
+        lea     hpf_mod,%a0
+        lea     (%a0,%d2.l*4),%a0
+        move.b  %d0,1(%a0)                        | TYP, FRQ, DEP, RES: byte 1
+9:      rts
+
+        | The fields mod_full reads, in out[]'s order; DEP last, so the
+        | build without it reads one fewer.
+        .align  2
+vd_hf:
+        .long   vd_typ, vd_frq, vd_res, vd_atk, vd_sus, vd_pol
+        .if     P_DEP
+        .long   vd_dep
+        .endif
+
         .align  2
 vs_body:
         .if     P_TIMING
@@ -339,6 +634,32 @@ vs_body:
         rts                                       | DAC SUM off: no filter, no sum
 1:      lea     -160(%sp),%sp
         movem.l %d0-%d7/%a0-%a6,(%sp)             | 60 B; (cL, cR) at +60, 68 B; entries at +128
+        .if     P_MODPROF
+        move.l  DTCN0,%d0                         | profiling build only
+        move.l  %d0,mp_t0
+        .endif
+        .if     P_MODPASS
+        bsr.w   mod_pass                          | elemod 1.5: the values core plays
+        .else
+        lea     hpf_track,%a0                     | probe build: the idle tick's values
+        lea     hpf_mod,%a1                       | (hpf_track, shp_track, shp_any) as
+        moveq   #2 * VOICE_TRACKS,%d0             | they are, no core reads
+1:      move.l  (%a0)+,(%a1)+
+        subq.l  #1,%d0
+        bne.s   1b
+        move.l  shp_any,%d0
+        move.l  %d0,shp_mod_any
+        .endif
+        .if     P_MODPROF
+        move.l  DTCN0,%d0
+        sub.l   mp_t0,%d0
+        add.l   %d0,mp_sum
+        addq.l  #1,mp_n
+        cmp.l   mp_max,%d0
+        bls.s   1f
+        move.l  %d0,mp_max
+1:
+        .endif
         move.l  %macsr,%d0
         move.l  %d0,-(%sp)
         move.l  #0xa0,%macsr
@@ -352,7 +673,7 @@ vs_body:
         lea     VCA_L,%a1
         lea     VOICE_OWNER,%a0
         lea     gaintab,%a2
-        lea     hpf_track,%a5
+        lea     hpf_mod,%a5                       | elemod 1.5: was hpf_track
         moveq   #0,%d5                            | physical voice
 2:      move.l  (%a3)+,%d3
         lsl.l   #3,%d3                            | slot * 8, one (cL, cR)
@@ -360,6 +681,12 @@ vs_body:
         lsr.l   #1,%d0                            | slot * 4
         mvz.b   (%a0,%d5.l),%d2                   | owning track
         move.l  (%a5,%d2.l*4),%d1                 | its filter entry
+        move.l  %d0,%d7                           | elemod 1.5: its FRQ fraction
+        lsr.l   #2,%d7                            | to the slot's frq_frac
+        lea     mod_frac,%a6
+        move.b  (%a6,%d2.l),%d4
+        lea     frq_frac,%a6
+        move.b  %d4,(%a6,%d7.l)
         move.l  %d1,ENT-COEF(%a4,%d0.l)
         moveq   #0,%d0
         moveq   #0,%d1
@@ -383,7 +710,7 @@ vs_body:
         clr.w   %d1                               | g, Q31
         sub.l   %d0,%d1                           | cR
 3:      mvz.b   (%a0,%d5.l),%d2                   | owning track
-        move.l  48(%a5,%d2.l*4),%d4               | its shp_track entry
+        move.l  48(%a5,%d2.l*4),%d4               | its shp_mod entry (elemod 1.5)
         btst    #8,%d4
         beq.s   4f
         neg.l   %d0                               | POL: the voice inverted
@@ -394,7 +721,7 @@ vs_body:
         addq.l  #1,%d5
         moveq   #8,%d0
         cmp.l   %d0,%d5
-        blt.s   2b
+        blt.w   2b
 
         .if     P_PROF
         mvz.b   MUP_INT,%d0
@@ -423,7 +750,17 @@ vs_body:
         lea     flt_gain,%a1
         moveq   #7,%d7
 13:     move.l  (%a6)+,%d5                        | TYP << 24 | FRQ << 16 | DEP << 8 | RES
-        cmp.l   (%a3),%d5
+        moveq   #7,%d0
+        sub.l   %d7,%d0                           | the slot
+        lea     frq_frac,%a0
+        mvz.b   (%a0,%d0.l),%d1                   | its FRQ fraction (mod_pass)
+        lea     flt_kfrac,%a0
+        mvz.b   (%a0,%d0.l),%d2
+        cmp.l   %d1,%d2
+        beq.s   24f
+        move.b  %d1,(%a0,%d0.l)                   | moved: worked out again
+        bra.s   20f
+24:     cmp.l   (%a3),%d5
         bne.s   20f
         lea     12(%a5),%a5                       | unchanged: as last block
         addq.l  #4,%a3
@@ -452,6 +789,17 @@ vs_body:
 21:     move.l  %d4,%d2
         and.l   #0xff,%d2                         | FRQ
         move.l  (%a2,%d2.l*4),%d6                 | p
+        moveq   #7,%d0
+        sub.l   %d7,%d0
+        lea     frq_frac,%a0
+        mvz.b   (%a0,%d0.l),%d0
+        beq.s   25f
+        move.l  4(%a2,%d2.l*4),%d1                | p at FRQ + 1
+        sub.l   %d6,%d1
+        asr.l   #8,%d1
+        muls.l  %d0,%d1
+        add.l   %d1,%d6                           | p, interpolated by the fraction
+25:
         mvz.w   (%a1,%d3.l*2),%d1
         swap    %d1                               | g, Q31
         move.l  #0x7fffffff,%d0
@@ -586,7 +934,7 @@ vs_body:
         cmpa.l  #hpf_state+64,%a0
         bne.w   7b
         jsr     bq_run                            | the 2-pole slots
-        tst.l   shp_any
+        tst.l   shp_mod_any                       | elemod 1.5: was shp_any
         beq.s   31f
         jsr     shp_run                           | the transient shaper
 31:
@@ -863,19 +1211,64 @@ voice_dac_page_fn:                                | core_page_fns: page 13
         .align  2
 page_hpf:
         .long   PAGE_HPF, txt_page
-        .long   ID_FRQ, ID_RES, ID_TYP, ID_DEP, ID_ATK, ID_SUS, ID_POL, 0
+        .long   ID_FRQ, ID_RES, ID_TYP, ID_DEPK, ID_ATK, ID_SUS, ID_POL, 0
 page_hpf_1p:
         .long   PAGE_HPF, txt_page
-        .long   ID_FRQ, 0, ID_TYP, ID_DEP, ID_ATK, ID_SUS, ID_POL, 0
+        .long   ID_FRQ, 0, ID_TYP, ID_DEPK, ID_ATK, ID_SUS, ID_POL, 0
 page_hpf_off:
         .long   PAGE_HPF, txt_page
-        .long   0, 0, ID_TYP, ID_DEP, ID_ATK, ID_SUS, ID_POL, 0
+        .long   0, 0, ID_TYP, ID_DEPK, ID_ATK, ID_SUS, ID_POL, 0
+        .if     P_DEP
+        .equ    ID_DEPK,        ID_DEP            | elemod 1.5: DEP's knob
+        .else
+        .equ    ID_DEPK,        0                 | without DEP: an empty slot
+        .endif
         | core_params: the page's ids, 5, 7, 11..14 and 457
         .globl  voice_dac_p5, voice_dac_p7, voice_dac_p11, voice_dac_p457
 voice_dac_p5:   .long   ID_FRQ, ID_FRQ, vd_param_get, vd_param_delta, vd_param_text
 voice_dac_p7:   .long   ID_ATK, ID_ATK, vd_param_get, vd_param_delta, vd_param_text
 voice_dac_p11:  .long   ID_TYP, ID_SUS, vd_param_get, vd_param_delta, vd_param_text
 voice_dac_p457: .long   ID_POL, ID_POL, vd_param_get, vd_param_delta, vd_param_text
+        | core_lock_params (elemod 1.5): {field, knob id, min, max, short
+        | name, name, category}. The short names are the page's labels.
+        .globl  voice_dac_lock_typ, voice_dac_lock_frq, voice_dac_lock_res
+        .globl  voice_dac_lock_atk, voice_dac_lock_sus, voice_dac_lock_pol
+        .align  2
+voice_dac_lock_typ:
+        .long   vd_typ, ID_TYP
+        .word   0, TYP_PK
+        .long   txt_typ_short, txt_typ_long, txt_cat
+voice_dac_lock_frq:
+        .long   vd_frq, ID_FRQ
+        .word   0, FRQ_MAX
+        .long   txt_frq_short, txt_frq_long, txt_cat
+voice_dac_lock_res:
+        .long   vd_res, ID_RES
+        .word   0, 127
+        .long   txt_res_short, txt_res_long, txt_cat
+voice_dac_lock_atk:
+        .long   vd_atk, ID_ATK
+        .word   0, 127
+        .long   txt_atk_short, txt_atk_long, txt_cat
+voice_dac_lock_sus:
+        .long   vd_sus, ID_SUS
+        .word   0, 127
+        .long   txt_sus_short, txt_sus_long, txt_cat
+voice_dac_lock_pol:
+        .long   vd_pol, ID_POL
+        .word   0, 1
+        .long   txt_pol_short, txt_pol_long, txt_cat
+        .if     P_DEP
+        .globl  voice_dac_lock_dep
+voice_dac_lock_dep:
+        .long   vd_dep, ID_DEP
+        .word   0, DEP_FULL
+        .long   txt_dep_short, txt_dep_long, txt_cat
+        .endif
+txt_cat:
+        .asciz  "DAC"
+        .align  2
+
         | core_view_pages: DAC FILTER behind FILTER.
         | The FILTER key steps to it only while DAC SUM is on (shown, below).
         .globl  voice_dac_view_page
@@ -913,7 +1306,7 @@ vd_shown:
         .align  2
 flt_entry:
         move.l  %d2,-(%sp)
-        move.l  #vd_flt,%d0
+        move.l  #VD_FLT,%d0
         bsr.w   vd_get                            | TYP, FRQ ^ 0x7f, DEP ^ 0x7f, RES
         eor.l   #(FLT_7_BITS << 14) + (FLT_7_BITS << 7),%d0
         move.l  %d0,%d2
@@ -1030,7 +1423,7 @@ flt_set:
         move.l  (%sp),%d0
         bsr.w   flt_pack
         move.l  %d0,%d1
-        move.l  #vd_flt,%d0
+        move.l  #VD_FLT,%d0
         bsr.w   vd_put                            | the sound's vd_flt
         lea     -8(%sp),%sp                       | SoundConfigChangedInfo, kind 1
         move.l  #SOUND_CONFIG_CHANGED,(%sp)
@@ -1052,11 +1445,59 @@ flt_set:
         | index 0.
         |   vd_get(d0 = field, a0 = live sound) -> d0 = its value.
         |   vd_put(d0 = field, d1 = value, a0 = live sound).
+        | elemod 1.5: VD_FLT and VD_SHP as the field are 1.4's two words,
+        | packed from and into the seven fields; vd_raw_get and vd_raw_put
+        | are one field's.
         | Both keep every register but d0; neither runs in the audio
         | interrupt.
         | ------------------------------------------------------------------
         .align  2
 vd_get:
+        cmp.l   #VD_SHP,%d0
+        bhi.w   vd_raw_get                        | a field of its own
+        move.l  %d2,-(%sp)
+        cmp.l   #VD_FLT,%d0
+        bne.s   5f
+        move.l  #vd_typ,%d0                       | TYP << 21
+        bsr.s   vd_raw_get
+        moveq   #7,%d2
+        and.l   %d0,%d2
+        lsl.l   #7,%d2
+        move.l  #vd_frq,%d0                       | (FRQ ^ 0x7f) << 14
+        bsr.s   vd_raw_get
+        eor.l   #FLT_7_BITS,%d0
+        or.l    %d0,%d2
+        lsl.l   #7,%d2
+        .if     P_DEP
+        move.l  #vd_dep,%d0                       | (DEP ^ 0x7f) << 7
+        bsr.s   vd_raw_get
+        eor.l   #FLT_7_BITS,%d0
+        or.l    %d0,%d2
+        .endif                                    | without DEP: FULL, 0 here
+        lsl.l   #7,%d2
+        move.l  #vd_res,%d0                       | RES
+        bsr.s   vd_raw_get
+        or.l    %d0,%d2
+        bra.s   9f
+5:      move.l  #vd_atk,%d0                       | ATK << 8, two's complement
+        bsr.s   vd_raw_get
+        eor.l   #0x40,%d0
+        move.l  %d0,%d2
+        lsl.l   #7,%d2
+        move.l  #vd_sus,%d0                       | SUS << 1
+        bsr.s   vd_raw_get
+        eor.l   #0x40,%d0
+        or.l    %d0,%d2
+        lsl.l   #1,%d2
+        move.l  #vd_pol,%d0                       | POL
+        bsr.s   vd_raw_get
+        or.l    %d0,%d2
+9:      move.l  %d2,%d0
+        move.l  (%sp)+,%d2
+        rts
+
+        .align  2
+vd_raw_get:
         lea     -12(%sp),%sp
         movem.l %d1/%a0-%a1,(%sp)
         clr.l   -(%sp)                            | index, unused for a sound
@@ -1070,6 +1511,59 @@ vd_get:
 
         .align  2
 vd_put:
+        cmp.l   #VD_SHP,%d0
+        bhi.w   vd_raw_put                        | a field of its own
+        lea     -8(%sp),%sp
+        movem.l %d1-%d2,(%sp)
+        move.l  %d1,%d2                           | the word
+        cmp.l   #VD_FLT,%d0
+        bne.s   5f
+        moveq   #FLT_7_BITS,%d1                   | RES
+        and.l   %d2,%d1
+        move.l  #vd_res,%d0
+        bsr.s   vd_raw_put
+        lsr.l   #7,%d2
+        .if     P_DEP
+        moveq   #FLT_7_BITS,%d1                   | DEP
+        and.l   %d2,%d1
+        eor.l   #FLT_7_BITS,%d1
+        move.l  #vd_dep,%d0
+        bsr.s   vd_raw_put
+        .endif
+        lsr.l   #7,%d2
+        moveq   #FLT_7_BITS,%d1                   | FRQ
+        and.l   %d2,%d1
+        eor.l   #FLT_7_BITS,%d1
+        move.l  #vd_frq,%d0
+        bsr.s   vd_raw_put
+        lsr.l   #7,%d2
+        moveq   #7,%d1                            | TYP
+        and.l   %d2,%d1
+        move.l  #vd_typ,%d0
+        bsr.s   vd_raw_put
+        bra.s   9f
+5:      moveq   #1,%d1                            | POL
+        and.l   %d2,%d1
+        move.l  #vd_pol,%d0
+        bsr.s   vd_raw_put
+        lsr.l   #1,%d2
+        moveq   #0x7f,%d1                         | SUS
+        and.l   %d2,%d1
+        eor.l   #0x40,%d1
+        move.l  #vd_sus,%d0
+        bsr.s   vd_raw_put
+        lsr.l   #7,%d2
+        moveq   #0x7f,%d1                         | ATK
+        and.l   %d2,%d1
+        eor.l   #0x40,%d1
+        move.l  #vd_atk,%d0
+        bsr.s   vd_raw_put
+9:      movem.l (%sp),%d1-%d2
+        lea     8(%sp),%sp
+        rts
+
+        .align  2
+vd_raw_put:
         lea     -12(%sp),%sp
         movem.l %d1/%a0-%a1,(%sp)
         move.l  %d1,-(%sp)                        | value
@@ -1196,6 +1690,16 @@ vd_project:
         subq.l  #1,%d0
         bne.s   1b
         clr.l   shp_any
+        lea     hpf_mod,%a0                       | elemod 1.5: hpf_mod, shp_mod,
+        moveq   #VOICE_TRACKS * 2 + 1,%d0         | shp_mod_any
+2:      clr.l   (%a0)+
+        subq.l  #1,%d0
+        bne.s   2b
+        lea     mod_frac,%a0
+        moveq   #VOICE_TRACKS / 4,%d0
+3:      clr.l   (%a0)+
+        subq.l  #1,%d0
+        bne.s   3b
         tst.l   PROJ_SINGLETON
         bne.s   dac_refresh
         rts                                       | at boot: the idle tick's
@@ -1511,6 +2015,38 @@ shp_track:
         | skips the shaper outright, so off it costs a test a block.
 shp_any:
         .long   0
+        | elemod 1.5: hpf_track and shp_track as core plays them (mod_pass),
+        | the trig's p-lock, the scene's lock, the performances, the LFO and
+        | the routes in; shp_mod at hpf_mod + 48, as the pan loop reads it,
+        | and shp_mod_any after it. mod_frac: each track's FRQ fraction.
+hpf_mod:
+        .space  VOICE_TRACKS * 4
+shp_mod:
+        .space  VOICE_TRACKS * 4
+shp_mod_any:
+        .long   0
+mod_frac:
+        .space  VOICE_TRACKS
+mod_pend:
+        .long   0                                 | tracks with a note not yet refreshed
+mod_rr:
+        .long   0                                 | the track refreshed in turn last
+mod_blk:
+        .long   0                                 | mod_pass's block count
+        .align  2
+vd_hs:
+        .space  4 * VD_NH                         | the handles (mod_handles), vd_hf's order
+vd_hs_ok:
+        .long   0                                 | vd_hs looked up
+        .if     P_MODPROF
+        .globl  vd_mp
+vd_mp:                                            | 'MODP', then the ticks: sum, count, most
+        .long   0x4d4f4450
+mp_sum: .long   0
+mp_n:   .long   0
+mp_max: .long   0
+mp_t0:  .long   0
+        .endif
         | Per slot: the coefficients the filter runs with, (b0, b1, p), and
         | the entry they were worked out from.
 flt_coef:
@@ -1519,6 +2055,13 @@ flt_key:
         .rept   8
         .long   -1
         .endr
+        | elemod 1.5: per slot, the FRQ fraction from its track's mod_frac
+        | (0..255), and the one its coefficients were worked out with
+frq_frac:
+        .space  8
+flt_kfrac:
+        .space  8
+        .align  2
 hpf_state:
         .rept   8
         .long   0, 0                              | x1, y1, per slot
@@ -1578,6 +2121,22 @@ bq_coef:
         move.l  (%a0,%d3.l*4),%d6                 | c, Q31
         lea     bq_sin,%a0
         move.l  (%a0,%d3.l*4),%d2                 | s, Q31
+        lea     frq_frac,%a0
+        mvz.b   (%a0,%d7.l),%d0                   | the slot's FRQ fraction
+        beq.s   9f
+        lea     bq_cos,%a0
+        move.l  4(%a0,%d3.l*4),%d1
+        sub.l   %d6,%d1
+        asr.l   #8,%d1
+        muls.l  %d0,%d1
+        add.l   %d1,%d6                           | c, interpolated
+        lea     bq_sin,%a0
+        move.l  4(%a0,%d3.l*4),%d1
+        sub.l   %d2,%d1
+        asr.l   #8,%d1
+        muls.l  %d0,%d1
+        add.l   %d1,%d2                           | s, interpolated
+9:
         lea     bq_kq_lh,%a0
         cmp.l   #TYP_LP2,%d4
         beq.s   1f
@@ -1939,7 +2498,7 @@ shp_run:
         move.l  (%a0,%d7.l*4),%d6                 | its slot
         lea     VOICE_OWNER,%a0
         mvz.b   (%a0,%d7.l),%d0                   | its track
-        lea     shp_track,%a0
+        lea     shp_mod,%a0                       | elemod 1.5: was shp_track
         move.l  (%a0,%d0.l*4),%d5                 | ATK << 24 | SUS << 16 | POL << 8
         lea     shp_state,%a3
         move.l  %d6,%d0
@@ -2451,9 +3010,11 @@ ca_each:
         rts
 
         | ------------------------------------------------------------------
-        | text(t), core_params: the popups; t = {obj, id, value, buf}. The
-        | value is read from the selected track's sound, in 8.8, as stock's
-        | value argument is not ours for these ids (it read 0 on the device).
+        | text(t), core_params: the popups; t = {obj, id, value, buf}. From
+        | 1.5 the value is t's, in 8.8: core's get answers it, the sound's, or
+        | with a pad held the trig's lock, the scene's lock or the performance's
+        | depth, so a lock reads as it plays. (Before core 0.4 it read 0 on the
+        | device, and 1.2-1.4 read the sound.)
         | FRQ goes on as stock's FRQ, id 47, so it reads as stock's does - in
         | hertz where filter-hz is built, whose gate follows. RES goes on as
         | stock's RES, id 48. TYP goes on as stock's TYP, id 49, at its index
@@ -2472,13 +3033,15 @@ vd_param_text:
         move.l  %d4,%d0
         jsr     flt_ours
         bne.w   11f
-        move.l  %d4,%d1
-        jsr     flt_shift
-        move.l  %d1,%d2
-        jsr     flt_cur
-        lsr.l   %d2,%d0
-        and.l   #0xff,%d0
-        lsl.l   #8,%d0
+        move.l  8(%a2),%d0                        | the value shown, 8.8: core's
+        asr.l   #8,%d0                            | (the sound's, or with a pad held
+        bpl.s   12f                               | the trig's lock, the scene's lock
+        moveq   #0,%d0                            | or the performance's depth)
+12:     moveq   #127,%d1
+        cmp.l   %d1,%d0
+        ble.s   13f
+        move.l  %d1,%d0
+13:     lsl.l   #8,%d0
         move.l  %d0,%d2                           | the value, 8.8
         cmp.l   #ID_FRQ,%d4
         bne.s   8f
@@ -2493,6 +3056,7 @@ vd_param_text:
         asr.l   #8,%d0
         cmp.l   #ID_TYP,%d4
         bne.s   3f
+        and.l   #7,%d0                            | TYP 0..7
         tst.l   %d0
         bne.s   2f
         lea     txt_off,%a0
@@ -2557,9 +3121,17 @@ vd_param_text:
 11:     move.l  %d4,%d0
         jsr     shp_ours
         bne.s   98f
-        move.l  %d4,%d0
-        move.l  %d3,%a1
-        jsr     shp_text
+        move.l  8(%a2),%d0                        | the value shown, 8.8, as above:
+        asr.l   #8,%d0                            | ATK and SUS 0..127 (64 the
+        move.l  %d4,%d1                           | centre), POL 0..1
+        cmp.l   #ID_POL,%d1
+        bne.s   14f
+        and.l   #1,%d0
+        bra.s   15f
+14:     and.l   #0x7f,%d0
+        sub.l   #64,%d0                           | -64..+63
+15:     move.l  %d3,%a1
+        jsr     shp_text_v
         moveq   #1,%d0                            | written
         bra.s   99f
 9:      move.l  %d4,4(%a2)                        | stock goes on as that id,
@@ -2577,8 +3149,8 @@ vd_param_text:
         | both re-emitted, rejoining at 0x400a858c. The frame holds d2-d5;
         | 24(%sp) is the id and 28(%sp) the value, the caller's argument slots,
         | which stock overwrites itself for its tail call; 40, 44 and 48(%sp)
-        | are the canvas, x and y. TYP is read from the selected track's sound,
-        | as the value argument is not ours. LP1 and HP1 draw as stock's TYP
+        | are the canvas, x and y. TYP is the value argument (from 1.5;
+        | 1.2-1.4 read the sound), so a locked TYP draws its own glyph. LP1 and HP1 draw as stock's TYP
         | (filter_type_knob_draw), its glyphs 1 and 3. OFF draws "OFF" as LFO
         | DST draws its name (lfo_dst_knob_draw), and returns. d0 is set by the
         | call that follows.
@@ -2590,10 +3162,9 @@ flt_glyph:
         moveq   #ID_TYP,%d0
         cmp.l   24(%sp),%d0
         bne.s   9f
-        jsr     flt_cur
-        swap    %d0
-        lsr.l   #8,%d0
-        and.l   #0xff,%d0                         | TYP
+        move.l  28(%sp),%d0                       | the value drawn, 8.8: the
+        asr.l   #8,%d0                            | sound's TYP, or with a pad
+        and.l   #7,%d0                            | held the lock core passes
         beq.s   1f
         lea     flt_stock_typ,%a0
         mvz.b   (%a0,%d0.l),%d0                   | stock's TYP index
@@ -2812,7 +3383,7 @@ shp_ours:
         .align  2
 shp_entry:
         move.l  %d2,-(%sp)
-        move.l  #vd_shp,%d0
+        move.l  #VD_SHP,%d0
         bsr.w   vd_get                            | ATK << 8, SUS << 1, POL
         move.l  %d0,%d2
         lsr.l   #8,%d0
@@ -2839,7 +3410,7 @@ shp_entry:
         .align  2
 shp_value:
         move.l  %d0,-(%sp)
-        move.l  #vd_shp,%d0
+        move.l  #VD_SHP,%d0
         bsr.w   vd_get                            | keeps d1/a0/a1
         move.l  (%sp)+,%d1                        | the id
         cmp.l   #ID_ATK,%d1
@@ -2987,7 +3558,7 @@ shp_set:
         tst.l   %d0
         beq.w   9f
         move.l  %d0,%a0                           | the live sound
-        move.l  #vd_shp,%d0
+        move.l  #VD_SHP,%d0
         bsr.w   vd_get                            | ATK << 8, SUS << 1, POL
         move.l  %d5,%d1
         and.l   #0x7f,%d1
@@ -3007,7 +3578,7 @@ shp_set:
         beq.s   3f
         moveq   #1,%d1
 3:      or.l    %d0,%d1
-        move.l  #vd_shp,%d0
+        move.l  #VD_SHP,%d0
         bsr.w   vd_put
         bsr.w   shp_entry
         lea     shp_track,%a1
@@ -3041,6 +3612,9 @@ shp_text:
         bra.s   2f
 1:      move.l  %d1,%d0
         bsr.w   shp_value
+        | shp_text_v(d0 = the value: ATK, SUS -64..+63, POL 0..1; d1 = id;
+        | a1 = the buffer): the text of a value given, not the sound's.
+shp_text_v:
 2:      cmp.l   #ID_POL,%d1
         bne.s   3f
         moveq   #'+',%d1

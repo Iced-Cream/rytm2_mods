@@ -5,7 +5,7 @@ Port of rytm-mods-src `mods/0004-lfo-rnd` (MrScruff; `built` in its mod.toml, li
 
 A second LFO page, LFO RND: press the LFO page key again (and again to return). DS1/DS2 (knobs A, B) are destinations picked from stock's LFO DST list restricted to sixteen (the eight machine parameters, FIN, STA, FRQ, RES, DEC, PAN, DEL, REV); DP1/DP2 (E, F) are depths, 0..64 in sixteen steps. On every note trig each modifier offsets its destination by a random -N..+N, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound, in core-ar2 0.2's mod storage (below). Voice tracks only; not p-lockable.
 
-Needs core-ar2 0.2 or later (`"resources": {"core": "0.2"}`).
+Needs core-ar2 0.2 or later (`"resources": {"core": "0.2"}`); from 1.2 core-ar2 0.4, from 1.3 core-ar2 0.9.
 
 ## Storage (1.1)
 
@@ -94,6 +94,26 @@ table is a `ptr` site.
 
 ## Changes from rytm-mods
 
+### 1.3: the four settings as core-ar2 parameters (core 0.9)
+
+The four settings are now four 4-bit sound fields, `lfo_rnd_ds1`, `lfo_rnd_dp1`, `lfo_rnd_ds2` and
+`lfo_rnd_dp2`, each a lockable parameter registered in `core_lock_params` on its page knob. DS1 and
+DS2 can be p-locked, scene-locked and reached over MIDI (NRPN and CCs), and step without
+smoothing. DP1 and DP2 are also LFO, velocity and aftertouch destinations (RND:Random 1 Depth,
+RND:Random 2 Depth). At each note's start the audio interrupt takes the four as core plays them
+(`core_param_int`: the sound's value, a trig's p-lock or a scene's lock, plus performances, the
+LFO and routes), so a p-locked or modulated depth or destination draws that note's offset. Needs
+core-ar2 0.9 (`"resources": {"core": "0.9"}`); it also links with 0.10.
+
+- **Settings saved by 1.1 and 1.2** (the one 16-bit field `lfo_rnd_cfg`) load as the defaults:
+  set LFO RND again on those sounds. lfo-rnd 1.0's word still loads.
+- **Known limit:** while a trig's lock or a scene's lock is edited, the LFO RND dials and popups
+  don't show the lock. Core passes a lock raw (0..15) where the dial expects 0..127, and the popups
+  read the sound. A core-ar2 fix, so that a locked value reaches the dial on the mod's scale, is
+  planned. The locks themselves play as set.
+- In a build with LFO destinations mods have 49 sound bits, so lfo-rnd 1.3 (16) links beside
+  voice-dac 1.5-nodep (32) but not beside voice-dac 1.5 with DEP (39).
+
 ### 1.2: on core-ar2 0.4's page tables
 
 LFO RND's page and its four knobs now go through core-ar2 0.4, which owns the entries of the
@@ -128,6 +148,20 @@ with core 0.4 (their sites overlap core's), and 1.2 does not link with core 0.3.
    change is kept and the rest are as they were.
 
 ## Results so far
+
+### 1.3 on core-ar2 0.9 and 0.10
+
+- Built and linked on irpina/elekloader main with core 0.9 and with core 0.10 (7d0bf15), alone
+  and with all eleven mods (voice-dac 1.5-nodep).
+- Hardware, Analog Rytm MKII OS 1.74, 2026-11-05/06: part of the all-eleven core 0.10 build used
+  for voice-dac 1.5's unit runs, which boot and play with it.
+- Hardware, 2026-11-06, read from lfo-rnd's tables (rcheck.py): DS1 set to FRQ by CC and shown in
+  its list, DP1 by CC; trigs on RS draw offsets that change note to note at DP1 8
+  ([-2, 3, 3, 5, 5, 0, 0, -6]) and are all 0 at DP1 0 (Test 2-3); a DP1 p-lock of 15 on RS step 1
+  over a sound DP1 of 0 draws offsets on that step from the second loop (core's limit for a step-1
+  lock made while stopped, see voice-dac's README); LFO 1 on RND:Random 1 Depth over a sound DP1 of 0 draws offsets while it
+  runs and none without it; DS1, DP1, DP2 kept through a kit save, a power cycle and KIT RELOAD
+  (Test 4) and through a power cycle without a kit save (Test 5). Test 6 (a 1.0 kit) not rerun.
 
 ### 1.2 on core-ar2 0.4
 

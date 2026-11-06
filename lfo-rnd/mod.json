@@ -1,11 +1,11 @@
 {
  "id": "lfo-rnd",
- "version": "1.2",
+ "version": "1.3",
  "title": "LFO RND page",
  "category": "Sound",
  "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
  "license": "GPL-2.0-only",
- "description": "A second LFO page, LFO RND, reached by pressing the LFO page key again: two random modifiers per sound, each a destination (DS1/DS2, one of 16, chosen from stock's LFO DST list) and a depth (DP1/DP2, 0..64 in 16 steps). On every note trig each modifier draws a random offset for its destination, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound through core-ar2 0.2's mod storage (one 16-bit sound field), so the sound's stock bytes stay stock; sounds saved by lfo-rnd 1.0 keep their settings. Port of rytm-mods 0004-lfo-rnd. From 1.2 the page goes through core-ar2 0.4's page tables and page-key lists (needs core 0.4, OS 1.74 only).",
+ "description": "A second LFO page, LFO RND, reached by pressing the LFO page key again: two random modifiers per sound, each a destination (DS1/DS2, one of 16, chosen from stock's LFO DST list) and a depth (DP1/DP2, 0..64 in 16 steps). On every note trig each modifier draws a random offset for its destination, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound through core-ar2 0.2's mod storage (one 16-bit sound field), so the sound's stock bytes stay stock; sounds saved by lfo-rnd 1.0 keep their settings. Port of rytm-mods 0004-lfo-rnd. From 1.2 the page goes through core-ar2 0.4's page tables and page-key lists (needs core 0.4, OS 1.74 only). From 1.3 (core-ar2 0.9) the four settings are four 4-bit sound fields, each a lockable parameter registered in core_lock_params on its page knob: DS1 and DS2 are lockable (p-locks, scene locks, MIDI) and step without smoothing; DP1 and DP2 are also LFO, velocity and aftertouch destinations (RND:Random 1 Depth, RND:Random 2 Depth). At each note's start the audio interrupt takes the four as core plays them (core_param_int: the sound's value, the trig's p-lock or the scene's lock, plus the performances, the LFO and the routes), so a p-locked or modulated depth or destination draws that note's offset. Settings saved by 1.1 and 1.2 (one 16-bit field) load as the defaults; lfo-rnd 1.0's word still loads (needs core 0.9).",
  "device": "analog-rytm-mk2",
  "os": "1.73",
  "sources": [
@@ -201,13 +201,44 @@
  ],
  "storage": [
   {
-   "sym": "lfo_rnd_cfg",
+   "sym": "lfo_rnd_ds1",
    "scope": "sound",
-   "bits": 16
+   "bits": 4,
+   "lock": true,
+   "smooth": false,
+   "cc": true
+  },
+  {
+   "sym": "lfo_rnd_dp1",
+   "scope": "sound",
+   "bits": 4,
+   "lock": true,
+   "smooth": false,
+   "lfo": true,
+   "mod": true,
+   "cc": true
+  },
+  {
+   "sym": "lfo_rnd_ds2",
+   "scope": "sound",
+   "bits": 4,
+   "lock": true,
+   "smooth": false,
+   "cc": true
+  },
+  {
+   "sym": "lfo_rnd_dp2",
+   "scope": "sound",
+   "bits": 4,
+   "lock": true,
+   "smooth": false,
+   "lfo": true,
+   "mod": true,
+   "cc": true
   }
  ],
  "resources": {
-  "core": "0.4"
+  "core": "0.9"
  },
  "requires": [
   "core"
@@ -443,6 +474,58 @@
      0,
      "abs32",
      "sym:lfo_rnd_view_page",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_lock_params",
+   "order": 12,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:lfo_rnd_lock_ds1",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_lock_params",
+   "order": 12,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:lfo_rnd_lock_dp1",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_lock_params",
+   "order": 12,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:lfo_rnd_lock_ds2",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_lock_params",
+   "order": 12,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:lfo_rnd_lock_dp2",
      0
     ]
    ]
