@@ -3010,9 +3010,11 @@ ca_each:
         rts
 
         | ------------------------------------------------------------------
-        | text(t), core_params: the popups; t = {obj, id, value, buf}. The
-        | value is read from the selected track's sound, in 8.8, as stock's
-        | value argument is not ours for these ids (it read 0 on the device).
+        | text(t), core_params: the popups; t = {obj, id, value, buf}. From
+        | 1.5 the value is t's, in 8.8: core's get answers it, the sound's, or
+        | with a pad held the trig's lock, the scene's lock or the performance's
+        | depth, so a lock reads as it plays. (Before core 0.4 it read 0 on the
+        | device, and 1.2-1.4 read the sound.)
         | FRQ goes on as stock's FRQ, id 47, so it reads as stock's does - in
         | hertz where filter-hz is built, whose gate follows. RES goes on as
         | stock's RES, id 48. TYP goes on as stock's TYP, id 49, at its index
@@ -3031,13 +3033,15 @@ vd_param_text:
         move.l  %d4,%d0
         jsr     flt_ours
         bne.w   11f
-        move.l  %d4,%d1
-        jsr     flt_shift
-        move.l  %d1,%d2
-        jsr     flt_cur
-        lsr.l   %d2,%d0
-        and.l   #0xff,%d0
-        lsl.l   #8,%d0
+        move.l  8(%a2),%d0                        | the value shown, 8.8: core's
+        asr.l   #8,%d0                            | (the sound's, or with a pad held
+        bpl.s   12f                               | the trig's lock, the scene's lock
+        moveq   #0,%d0                            | or the performance's depth)
+12:     moveq   #127,%d1
+        cmp.l   %d1,%d0
+        ble.s   13f
+        move.l  %d1,%d0
+13:     lsl.l   #8,%d0
         move.l  %d0,%d2                           | the value, 8.8
         cmp.l   #ID_FRQ,%d4
         bne.s   8f
@@ -3052,6 +3056,7 @@ vd_param_text:
         asr.l   #8,%d0
         cmp.l   #ID_TYP,%d4
         bne.s   3f
+        and.l   #7,%d0                            | TYP 0..7
         tst.l   %d0
         bne.s   2f
         lea     txt_off,%a0
@@ -3116,9 +3121,17 @@ vd_param_text:
 11:     move.l  %d4,%d0
         jsr     shp_ours
         bne.s   98f
-        move.l  %d4,%d0
-        move.l  %d3,%a1
-        jsr     shp_text
+        move.l  8(%a2),%d0                        | the value shown, 8.8, as above:
+        asr.l   #8,%d0                            | ATK and SUS 0..127 (64 the
+        move.l  %d4,%d1                           | centre), POL 0..1
+        cmp.l   #ID_POL,%d1
+        bne.s   14f
+        and.l   #1,%d0
+        bra.s   15f
+14:     and.l   #0x7f,%d0
+        sub.l   #64,%d0                           | -64..+63
+15:     move.l  %d3,%a1
+        jsr     shp_text_v
         moveq   #1,%d0                            | written
         bra.s   99f
 9:      move.l  %d4,4(%a2)                        | stock goes on as that id,
@@ -3136,8 +3149,8 @@ vd_param_text:
         | both re-emitted, rejoining at 0x400a858c. The frame holds d2-d5;
         | 24(%sp) is the id and 28(%sp) the value, the caller's argument slots,
         | which stock overwrites itself for its tail call; 40, 44 and 48(%sp)
-        | are the canvas, x and y. TYP is read from the selected track's sound,
-        | as the value argument is not ours. LP1 and HP1 draw as stock's TYP
+        | are the canvas, x and y. TYP is the value argument (from 1.5;
+        | 1.2-1.4 read the sound), so a locked TYP draws its own glyph. LP1 and HP1 draw as stock's TYP
         | (filter_type_knob_draw), its glyphs 1 and 3. OFF draws "OFF" as LFO
         | DST draws its name (lfo_dst_knob_draw), and returns. d0 is set by the
         | call that follows.
@@ -3149,10 +3162,9 @@ flt_glyph:
         moveq   #ID_TYP,%d0
         cmp.l   24(%sp),%d0
         bne.s   9f
-        jsr     flt_cur
-        swap    %d0
-        lsr.l   #8,%d0
-        and.l   #0xff,%d0                         | TYP
+        move.l  28(%sp),%d0                       | the value drawn, 8.8: the
+        asr.l   #8,%d0                            | sound's TYP, or with a pad
+        and.l   #7,%d0                            | held the lock core passes
         beq.s   1f
         lea     flt_stock_typ,%a0
         mvz.b   (%a0,%d0.l),%d0                   | stock's TYP index
@@ -3600,6 +3612,9 @@ shp_text:
         bra.s   2f
 1:      move.l  %d1,%d0
         bsr.w   shp_value
+        | shp_text_v(d0 = the value: ATK, SUS -64..+63, POL 0..1; d1 = id;
+        | a1 = the buffer): the text of a value given, not the sound's.
+shp_text_v:
 2:      cmp.l   #ID_POL,%d1
         bne.s   3f
         moveq   #'+',%d1

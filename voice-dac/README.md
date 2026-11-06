@@ -129,6 +129,10 @@ aftertouch destinations, smoothed as stock's knobs; TYP and POL step. Core 0.10'
   second, the tracks staggered), and one voice track's full set in turn every 4 blocks
   (`P_RR_DIV`). A track with TYP OFF skips the FRQ read. Reading everything every block cost
   about 3.5% of a block on a unit and hung it with eight voices on LP2 under an LFO (below).
+- With a pad held, the popups (FRQ, RES, TYP, DEP, ATK, SUS, POL) and TYP's glyph show the value
+  core passes: a trig's lock, a scene's lock or a performance's depth. 1.2-1.4 read them from the
+  sound, so a lock being edited read as the sound's value. The FRQ graph, and the PK test for
+  DEP's text, still read the sound.
 - `P_MODPROF` (0) builds a probe that times `mod_pass` in DMA timer 0 ticks, and `P_MODPASS 0`
   one that skips it (the idle tick's values only). Both are for measuring; the default build has
   neither.
