@@ -154,8 +154,14 @@ with core 0.4 (their sites overlap core's), and 1.2 does not link with core 0.3.
 - Built and linked on irpina/elekloader main with core 0.9 and with core 0.10 (7d0bf15), alone
   and with all eleven mods (voice-dac 1.5-nodep).
 - Hardware, Analog Rytm MKII OS 1.74, 2026-11-05/06: part of the all-eleven core 0.10 build used
-  for voice-dac 1.5's unit runs, which boot and play with it. Its own steps (Test above, and its
-  locks and modulation) are not yet checked on a unit.
+  for voice-dac 1.5's unit runs, which boot and play with it.
+- Hardware, 2026-11-06, read from lfo-rnd's tables (rcheck.py): DS1 set to FRQ by CC and shown in
+  its list, DP1 by CC; trigs on RS draw offsets that change note to note at DP1 8
+  ([-2, 3, 3, 5, 5, 0, 0, -6]) and are all 0 at DP1 0 (Test 2-3); a DP1 p-lock of 15 on RS step 1
+  over a sound DP1 of 0 draws offsets on that step from the second loop (core's limit for a step-1
+  lock made while stopped, see voice-dac's README); LFO 1 on RND:Random 1 Depth over a sound DP1 of 0 draws offsets while it
+  runs and none without it; DS1, DP1, DP2 kept through a kit save, a power cycle and KIT RELOAD
+  (Test 4) and through a power cycle without a kit save (Test 5). Test 6 (a 1.0 kit) not rerun.
 
 ### 1.2 on core-ar2 0.4
 

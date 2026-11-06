@@ -218,8 +218,25 @@ with core 0.4 (their sites overlap core's), and 1.3 does not link with core 0.3.
   - Listening: a SY DUAL VCO note held for the bar, LP2 FRQ 64 RES 70, an LFO sweeping DAC FRQ
     over the whole range once a bar: the sweep sounds smooth, with no audible stepping from
     the 375-a-second FRQ reads.
-- Not yet on a unit: 1.5 with DEP, p-locks and scene locks, velocity and aftertouch routes, MIDI
-  CCs, and the steps of Test above.
+- Hardware, 2026-11-06, unit checks read from voice-dac's tables (rcheck.py, every read judged
+  against an expected value):
+  - 1.5-nodep in the all-eleven build: TYP OFF..PK and POL by CC, FRQ by CC 51, a VELOCITY MOD
+    route to DAC FRQ (velocity 1, 64, 127 give FRQ 10, 73, 127 from a base of 10), an AFTERTOUCH
+    route (0, 64, 127, 0 give 10, 74, 127, 10), a scene lock on FRQ (on 127, off back to 20), and
+    FRQ/TYP/POL kept through a kit save, a power cycle, KIT RELOAD and a power cycle without a kit
+    save. A FRQ p-lock on step 1 plays from the second loop; see the known limit below.
+  - 1.5 with DEP: the defaults on a new sound on every voice track, DEP 0 and 127 at the knob's
+    ends and 64 by CC 9 (the 0.0dB and FULL popups shown), the LP1 and HP1 shelves (at DEP 64,
+    -16.00 dB at Nyquist for LP1 and at DC for HP1; 0 at DEP FULL; the slot off at DEP 0; one pole
+    for FRQ 60 throughout), and an LFO on DAC DEP sweeping DEP over 0..127.
+- Known limit (core, not this mod): a p-lock on step 1 made or changed while stopped plays from
+  the second loop after PLAY. With BD step 1 locked to FRQ 127 over a sound FRQ of 40, FRQ reads
+  40 for the first loop and 127 from the second. A lock on a later step plays on the first loop,
+  and a STOP or any stock edit on the track after the lock fixes it. Stock prepares step 1 when
+  stopped and on its own edits, and core's lock writes don't ask it to prepare it again. Seen on
+  the unit and in rytm-emu, and the same with lfo-rnd's DP1. A core-ar2 handover is written.
+- Not yet on a unit: the steps of Test above by hand (the unit checks cover their values, not the
+  screens), and DEP with lfo-rnd in one build (it does not fit).
 
 ### 1.4 on core-ar2 0.6
 
