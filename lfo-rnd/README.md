@@ -107,6 +107,10 @@ core-ar2 0.9 (`"resources": {"core": "0.9"}`); it also links with 0.10.
 
 - **Settings saved by 1.1 and 1.2** (the one 16-bit field `lfo_rnd_cfg`) load as the defaults:
   set LFO RND again on those sounds. lfo-rnd 1.0's word still loads.
+- **Known limit:** while a trig's lock or a scene's lock is edited, the LFO RND dials and popups
+  don't show the lock. Core passes a lock raw (0..15) where the dial expects 0..127, and the popups
+  read the sound. A core-ar2 fix, so that a locked value reaches the dial on the mod's scale, is
+  planned. The locks themselves play as set.
 - In a build with LFO destinations mods have 49 sound bits, so lfo-rnd 1.3 (16) links beside
   voice-dac 1.5-nodep (32) but not beside voice-dac 1.5 with DEP (39).
 
