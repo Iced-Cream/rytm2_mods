@@ -12,7 +12,13 @@ core-ar2 0.4's page tables, so they need core-ar2 0.4 (OS 1.74 only), and other 
 can link beside them. comp-preview 1.1 lists its preview through core 0.4's page-key lists for the
 same reason, so a mod can add a page behind COMP too. From v1.4, voice-dac 1.4 (MrScruff's
 rytm-mods-src 3a98e23: DAC FILTER's knobs follow TYP) needs core-ar2 0.6, whose page functions let
-a page's knobs follow the selected sound.
+a page's knobs follow the selected sound. From v1.5, lfo-rnd 1.3 and voice-dac 1.5 make their knobs
+core-ar2 parameters: each can be p-locked, scene-locked and reached over MIDI, and the depths and
+DAC FILTER's FRQ, RES, DEP, ATK and SUS are also LFO, velocity and aftertouch destinations.
+voice-dac 1.5 needs core-ar2 0.10 (its field inits and handle reads), lfo-rnd 1.3 core-ar2 0.9 or
+later. voice-dac also comes as 1.5-nodep (`voice-dac-nodep/`), the same without DEP, which takes 32
+sound bits in place of 39 so it links beside lfo-rnd in a build with LFO destinations. Settings
+saved by voice-dac 1.2-1.4 and lfo-rnd 1.1-1.2 load as the defaults: set them again after updating.
 
 No firmware is included: no OS files, sections, dumps or built `.syx`/`.elemod` files. The
 mods name firmware routines by address only (`include/ar2-1.73.inc`, `include/ar2-1.74.inc`), and their `mod.json`
@@ -94,8 +100,9 @@ reach only the selected track on 1.74.
 
 You need:
 
-- an [elekloader](https://github.com/irpina/elekloader) checkout at `main` with core-ar2 0.6
-  (irpina/elekloader#179) and the Python 3 it asks for (v1.3 builds with core-ar2 0.4 or 0.5, from irpina/elekloader#155 on);
+- an [elekloader](https://github.com/irpina/elekloader) checkout at `main` with core-ar2 0.10
+  (irpina/elekloader#255) and the Python 3 it asks for (v1.4 builds with core-ar2 0.6, from
+  irpina/elekloader#179 on; v1.3 with core-ar2 0.4 or 0.5, from irpina/elekloader#155 on);
 - ColdFire binutils on `PATH` (`m68k-linux-gnu-as` and `-ld`; on Debian or Ubuntu,
   `apt install binutils-m68k-linux-gnu`);
 - your own copy of Elektron's stock Analog Rytm MKII OS 1.74 `.syx`. It is never part
@@ -111,18 +118,22 @@ OS=-os1.74
 cd "$EL"
 python3 -m elekloader.sdk.build mods/core-ar2 --stock "$STOCK"
 MODS="filter-hz ctrl-all env-reset-amp slice-loop euclid-accents velocity-humanise lfo-rnd
-      comp-preview main-rms kit-ab voice-dac"
+      comp-preview main-rms kit-ab voice-dac-nodep"
 ARGS=""
 for m in $MODS; do
   python3 -m elekloader.sdk.build "$R2/$m" --stock "$STOCK"
+  ID=$(python3 -c "import json; print(json.load(open('$R2/$m/mod.json'))['id'])")
   V=$(python3 -c "import json; print(json.load(open('$R2/$m/mod.json'))['version'])")
-  ARGS="$ARGS --mod $R2/$m/out/$m-$V$OS.elemod"
+  ARGS="$ARGS --mod $R2/$m/out/$ID-$V$OS.elemod"
 done
-python3 -m elekloader.patch --stock "$STOCK" --mod mods/core-ar2/out/core-0.6.elemod $ARGS \
+python3 -m elekloader.patch --stock "$STOCK" --mod mods/core-ar2/out/core-0.10.elemod $ARGS \
     --out rytm-mods.syx --version R2AL --lockfile rytm-mods.lock.json
 ```
 
-Leave out any mod you don't want from `MODS`. Keep `rytm-mods.lock.json` and pass it again
+Leave out any mod you don't want from `MODS`. With all eleven, voice-dac must be
+`voice-dac-nodep`: voice-dac 1.5 with DEP (39 sound bits), lfo-rnd 1.3 (16) and core's LFO destination
+field (7) need 62 of the 56 bits a sound has, so `elekloader.patch` refuses it. Use `voice-dac` (with DEP)
+in a build without lfo-rnd. Keep `rytm-mods.lock.json` and pass it again
 for every later build: it says where each mod's settings live in your projects, kits and
 sounds, so a build that adds or drops a mod still reads them. (A lost lockfile can be taken back
 out of the last build with `--lockfile-from rytm-mods.syx`.) `elekloader.patch`
@@ -141,11 +152,11 @@ keep it, and the `out/` build folders, out of git and out of any upload.
 | 0015-env-reset-amp | `env-reset-amp/` | hardware-verified | bit probe left out; matches label by label; **confirmed on a unit** |
 | 0002-euclid-accents | `euclid-accents/` | hardware-verified | 1.2 on core-ar2 0.4's pages and 1.1, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 matches label by label, **confirmed on a unit** |
 | 0003-velocity-humanise | `velocity-humanise/` | built (MANUAL: verified) | 1.2 on core-ar2 0.4's pages: **confirmed on a unit** on OS 1.74; 1.1, settings in core-ar2 0.3's storage, stands alone: **confirmed on a unit** on OS 1.74; 1.0 matches label by label, **confirmed on a unit** |
-| 0004-lfo-rnd | `lfo-rnd/` | built (MANUAL: verified) | 1.2 on core-ar2 0.4's pages: **confirmed on a unit** on OS 1.74; 1.1, settings in core-ar2's storage: **confirmed on a unit** on OS 1.74 with core 0.3; 1.0 matches label by label, **confirmed on a unit** |
+| 0004-lfo-rnd | `lfo-rnd/` | built (MANUAL: verified) | 1.3, its knobs core-ar2 0.9 parameters: links and runs in the all-eleven build on a unit, OS 1.74 (core 0.10), its locks and modulation not yet tested there; 1.2 on core-ar2 0.4's pages: **confirmed on a unit** on OS 1.74; 1.1, settings in core-ar2's storage: **confirmed on a unit** on OS 1.74 with core 0.3; 1.0 matches label by label, **confirmed on a unit** |
 | 0006-comp-preview | `comp-preview/` | hardware-verified | 1.1, its preview in core-ar2 0.4's COMP list: **confirmed on a unit** on OS 1.74, also beside duck; 1.0 matches label by label, **confirmed on a unit** |
 | 0009-main-rms | `main-rms/` | built (MANUAL: display checked on the device) | matches label by label; **confirmed on a unit** |
 | 0010-kit-ab | `kit-ab/` | hardware-verified | matches label by label; **confirmed on a unit** |
-| 0013-voice-dac | `voice-dac/` | hardware-verified | default build only (no timing, prof, burn or dbg); 1.1, MrScruff's update (76ae299): matches label by label but for three names where sections meet; 1.4 (3a98e23, knobs follow TYP) on core-ar2 0.6: **confirmed on a unit** on OS 1.74; 1.3 on core-ar2 0.4's pages and 1.2, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 **confirmed on a unit** |
+| 0013-voice-dac | `voice-dac/` | hardware-verified | default build only (no timing, prof, burn or dbg); 1.5-nodep on core-ar2 0.10, its knobs core parameters: an LFO on DAC FRQ **confirmed on a unit** on OS 1.74 (no hang, a slow sweep sounds smooth), the other locks and destinations not yet; 1.5 (with DEP) built and linked, not run on a unit; 1.1, MrScruff's update (76ae299): matches label by label but for three names where sections meet; 1.4 (3a98e23, knobs follow TYP) on core-ar2 0.6: **confirmed on a unit** on OS 1.74; 1.3 on core-ar2 0.4's pages and 1.2, settings in core-ar2 0.3's storage: **confirmed on a unit** on OS 1.74; 1.0 **confirmed on a unit** |
 
 Every mod on rytm-mods-src main is now ported. "Matches label by label": `tools/verify_port.py`
 re-assembles rytm-mods' own code, checks it equals rytm-mods-src's default build ("T2"), then
