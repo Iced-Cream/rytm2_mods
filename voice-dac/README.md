@@ -323,7 +323,7 @@ yet run on a unit.
 ### 1.6: POL on a mod-kept id (core 0.12)
 
 Core-ar2 0.12 gives machine slots 44..52 to mod machines, so CB TEST's record 457, which POL borrowed
-(slot 52), is no longer ours. POL's knob id is now 593, a mod-kept id above stock's records, with its
+(slot 52), is no longer ours. POL's knob id is now the mod's own `__knobs` (`"knobs": 1`; the linker allocates it from 555 up), with its
 name and short name from the `core_lock_params` entry; the two `ptr` sites that renamed record 457's
 texts are gone (both ports). The other ids are unchanged (5, 7, 11..14: stock ids and dead Error
 records). Same behaviour and sound. Needs core-ar2 0.12 (`"resources": {"core": "0.12"}`). Not yet

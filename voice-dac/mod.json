@@ -1,6 +1,6 @@
 {
  "id": "voice-dac",
- "version": "1.5",
+ "version": "1.6",
  "title": "DAC sum, voice filter, shaper and polarity",
  "category": "Sound",
  "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
@@ -468,7 +468,7 @@
     [
      0,
      "abs32",
-     "sym:voice_dac_p593",
+     "sym:voice_dac_pol",
      0
     ]
    ]
@@ -577,5 +577,6 @@
     ]
    ]
   }
- ]
+ ],
+ "knobs": 1
 }
