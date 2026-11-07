@@ -159,8 +159,9 @@
         .equ    ID_RES,         13
         .equ    ID_ATK,         7                 | Error, renamed
         .equ    ID_SUS,         14                | Error, renamed
-        .equ    ID_POL,         457               | CB TEST's CB_OSC_SELECT, renamed: the
-                                                  | TEST machines are hidden
+        .equ    ID_POL,         593               | a mod-kept id, above stock's records (core
+                                                  | 0.12 gives CB TEST's slot, 52, to mod
+                                                  | machines, so 457 is no longer ours)
         .equ    ID_STOCK_PAN,   62                | its encoder feel, for ATK and SUS
         .equ    ID_STOCK_FINE,  40                | SAMPLE FINE: its dial, dotted at 0
         .equ    PI_DRAW,        0x24              | RAM record: the knob's draw callback
@@ -1223,12 +1224,12 @@ page_hpf_off:
         .else
         .equ    ID_DEPK,        0                 | without DEP: an empty slot
         .endif
-        | core_params: the page's ids, 5, 7, 11..14 and 457
-        .globl  voice_dac_p5, voice_dac_p7, voice_dac_p11, voice_dac_p457
+        | core_params: the page's ids, 5, 7, 11..14 and 593
+        .globl  voice_dac_p5, voice_dac_p7, voice_dac_p11, voice_dac_p593
 voice_dac_p5:   .long   ID_FRQ, ID_FRQ, vd_param_get, vd_param_delta, vd_param_text
 voice_dac_p7:   .long   ID_ATK, ID_ATK, vd_param_get, vd_param_delta, vd_param_text
 voice_dac_p11:  .long   ID_TYP, ID_SUS, vd_param_get, vd_param_delta, vd_param_text
-voice_dac_p457: .long   ID_POL, ID_POL, vd_param_get, vd_param_delta, vd_param_text
+voice_dac_p593: .long   ID_POL, ID_POL, vd_param_get, vd_param_delta, vd_param_text
         | core_lock_params (elemod 1.5): {field, knob id, min, max, short
         | name, name, category}. The short names are the page's labels.
         .globl  voice_dac_lock_typ, voice_dac_lock_frq, voice_dac_lock_res

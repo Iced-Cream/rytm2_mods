@@ -91,7 +91,7 @@
   }
  ],
  "resources": {
-  "core": "0.10"
+  "core": "0.12"
  },
  "sites": [
   {
@@ -243,18 +243,6 @@
    "stock": "40236f0d",
    "op": "ptr",
    "target": "voice_dac_txt_sus_short"
-  },
-  {
-   "addr": "0x401c5614",
-   "stock": "40237c39",
-   "op": "ptr",
-   "target": "voice_dac_txt_pol_long"
-  },
-  {
-   "addr": "0x401c561c",
-   "stock": "4025a3fc",
-   "op": "ptr",
-   "target": "voice_dac_txt_pol_short"
   }
  ],
  "requires": [
@@ -415,18 +403,6 @@
      "stock": "4023723d",
      "op": "ptr",
      "target": "voice_dac_txt_sus_short"
-    },
-    {
-     "addr": "0x401c58c4",
-     "stock": "40237f69",
-     "op": "ptr",
-     "target": "voice_dac_txt_pol_long"
-    },
-    {
-     "addr": "0x401c58cc",
-     "stock": "4025a72c",
-     "op": "ptr",
-     "target": "voice_dac_txt_pol_short"
     }
    ]
   }
@@ -492,7 +468,7 @@
     [
      0,
      "abs32",
-     "sym:voice_dac_p457",
+     "sym:voice_dac_p593",
      0
     ]
    ]

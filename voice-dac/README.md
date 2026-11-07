@@ -319,3 +319,12 @@ yet run on a unit.
 - rytm-emu (3c4c42c), the full build (core-ar2 with all eleven ports): DAC SUM switched ON, FILTER twice opens DAC FILTER, then 16 MIDI notes and pad hits: the main output and the modelled analog voices recorded sample-for-sample identical to T2 (both differ from stock); all 21 screens pixel-identical to T2.
 - Hardware: on an Analog Rytm MKII, 2026-10-14, in the full build (core-ar2 with all eleven ports): DAC SUM on and off, compared by
   ear with rytm-mods' own build: the same on both.
+
+### 1.6: POL on a mod-kept id (core 0.12)
+
+Core-ar2 0.12 gives machine slots 44..52 to mod machines, so CB TEST's record 457, which POL borrowed
+(slot 52), is no longer ours. POL's knob id is now 593, a mod-kept id above stock's records, with its
+name and short name from the `core_lock_params` entry; the two `ptr` sites that renamed record 457's
+texts are gone (both ports). The other ids are unchanged (5, 7, 11..14: stock ids and dead Error
+records). Same behaviour and sound. Needs core-ar2 0.12 (`"resources": {"core": "0.12"}`). Not yet
+linked or run in the emulator or on the unit.
