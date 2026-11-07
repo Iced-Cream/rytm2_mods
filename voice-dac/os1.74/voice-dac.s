@@ -1267,6 +1267,12 @@ voice_dac_lock_dep:
         .word   0, DEP_FULL
         .long   txt_dep_short, txt_dep_long, txt_cat
         .endif
+        | core_knob_looks (core 0.12): POL draws as CB TEST's switch, 457's
+        | knob and range (0..1), as it did on record 457 itself.
+        .globl  voice_dac_looks
+        .align  2
+voice_dac_looks:
+        .long   ID_POL, ID_POL, 457, 0, 0, 0
 txt_cat:
         .asciz  "DAC"
         .align  2

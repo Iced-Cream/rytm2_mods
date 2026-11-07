@@ -576,6 +576,19 @@
      0
     ]
    ]
+  },
+  {
+   "to": "core_knob_looks",
+   "order": 13,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:voice_dac_looks",
+     0
+    ]
+   ]
   }
  ],
  "knobs": 1
