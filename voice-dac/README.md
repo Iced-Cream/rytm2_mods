@@ -329,3 +329,39 @@ texts are gone (both ports). The other ids are unchanged (5, 7, 11..14: stock id
 records). Same behaviour and sound. Needs core-ar2 0.12 (`"resources": {"core": "0.12"}`). Not yet
 linked or run in the emulator or on the unit.
 POL keeps its switch look through core 0.12's `core_knob_looks` (`voice_dac_looks`: it borrows 457's knob and 0..1 range), so the page draws as in 1.5.
+
+### 1.7: less audio-interrupt time for DAC SUM and the filters (same output)
+
+The unit runs of 2026-11-08 read CPU about 86.7 % stopped with Overbridge linked, 91.5 % with DAC SUM on,
+and 100 % (DSP 91.5 %) with an LP2 DAC filter on one track, where remote knob turns expired. Interrupt
+time comes straight out of the UI's (analog-rytm-mkii/case-study-ui-cpu-budget.md), so 1.7 makes the
+interrupt's per-block work shorter. Every output word stays the same as 1.6's: the receive buffer's
+filtered voices, the PRE pair, and the filter and shaper states.
+
+- **The sum, two frames at a time.** Frame A goes into acc0/acc1 and frame B (the next frame) into
+  acc2/acc3, so each slot's (cL, cR) loads once for both frames. Each slot's samples and coefficients load
+  during the previous slot's multiplies, so there are no separate loads. Each accumulator takes the same
+  terms in the same order as 1.6's frame, so each result is the same.
+- **No voice on the bus.** When every (cL, cR) is zero (every voice off the main bus, or its VCA words
+  both 0), the sum would only take each PRE word through an accumulator and back. That is `(w << 8) >> 8`,
+  the word with its top byte cleared, so 1.7 does that directly, without the 512 multiplies. The timing
+  build keeps the full sum, for its counters.
+- **The pan split, cached per voice.** (cL, cR) depends only on the voice's two VCA words, its slot,
+  whether its track is off the main bus, and POL. `pan_cache` keeps each voice's inputs and result, so the
+  divide and multiply run only when one of those changes.
+- **The 1-pole pair and the biquads without register moves.** In the 1-pole pair, x and x1 trade
+  registers each frame. `bq_run` is unrolled over the 32 frames, with x rotating through d0-d2 and y
+  through d3/d4. That replaces 1.6's two moves a frame (1-pole) and three moves a frame (biquad). The
+  multiply-accumulates and their order are unchanged.
+
+Not changed: what core is asked and when (mod_pass), the coefficient pass, the shaper, and the UI side.
+.run grows by about 1 KB.
+
+Checked so far: the build links (OS 1.74). An instruction-level harness (`tools/vd_bitexact/`) runs 1.6's
+and 1.7's pan pass, 1-pole pair, `bq_run` and sum on random inputs over runs of blocks, with extreme
+values, saturation, voices on and off the bus, POL flips and silent blocks. The two outputs match byte for
+byte, under two EMAC saturation models (48-bit accumulator, or a clamp at each step). Bugs planted on
+purpose in each of the four parts are all caught. Executed instructions per block, harness I/O included:
+DAC SUM with no filter 2102 -> 1827, voices silent 2014 -> 1091, one LP2 2507 -> 2123, every slot LP1
+3694 -> 3163, every slot LP2 5342 -> 4195. Those are instructions, not cycles. Not yet run in the emulator
+or on a unit, and the CPU gain on a unit is not measured.

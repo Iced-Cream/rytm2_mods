@@ -620,6 +620,21 @@ vd_hf:
         .long   vd_dep
         .endif
 
+        | p1f: one frame of the 1-pole pair (1.7), x and x1 by register;
+        | the same multiply-accumulates, in the same order, as 1.6's frame.
+        .macro  p1f i, xa, xa1, xb, xb1
+        mac.l   \xa,%d7,%acc2
+        mac.l   \xb,%a4,%acc3
+        mac.l   \xa1,%a1,%acc2
+        mac.l   \xb1,%a6,%acc3
+        mac.l   %d4,%d6,RXSTRIDE*(\i+1)(%a2),\xa1,%acc2 | x1 = x; the next x, A
+        mac.l   %d5,%a3,RXSTRIDE*(\i+1)+4(%a2),\xb1,%acc3 | and B
+        movclr.l %acc2,%d4                        | y, A
+        movclr.l %acc3,%d5                        | y, B
+        move.l  %d4,RXSTRIDE*\i(%a2)
+        move.l  %d5,RXSTRIDE*\i+4(%a2)
+        .endm
+
         .align  2
 vs_body:
         .if     P_TIMING
@@ -690,15 +705,44 @@ vs_body:
         lea     frq_frac,%a6
         move.b  %d4,(%a6,%d7.l)
         move.l  %d1,ENT-COEF(%a4,%d0.l)
-        moveq   #0,%d0
-        moveq   #0,%d1
+        | 1.7: (cL, cR) are a function of the voice's VCA words, its slot,
+        | whether its track is off the main bus and its POL, and nothing else;
+        | pan_cache keeps each voice's last inputs and result, so the divide
+        | and multiply run only when one of them changes.
+        lea     pan_cache,%a6
+        move.l  %d5,%d4
+        lsl.l   #4,%d4
+        add.l   %d4,%a6                           | the voice's key, aux, cL, cR
         move.l  %d6,%d4
         asr.l   %d2,%d4
-        btst    #0,%d4
-        bne.s   3f                                | off the main bus
+        moveq   #1,%d1
+        and.l   %d1,%d4                           | off the main bus
+        lsl.l   #8,%d4
+        move.l  48(%a5,%d2.l*4),%d1               | its shp_mod entry (elemod 1.5)
+        and.l   #0x100,%d1                        | POL
+        add.l   %d1,%d1
+        or.l    %d1,%d4
+        or.l    %d7,%d4                           | aux: slot | off << 8 | POL << 9
         mvz.w   (%a1),%d0                         | wL
         mvz.w   VCA_R-VCA_L(%a1),%d1              | wR
-        add.l   %d0,%d1
+        move.l  %d0,%d7
+        swap    %d7
+        or.l    %d1,%d7                           | key: wL << 16 | wR
+        cmp.l   (%a6),%d7
+        bne.s   5f
+        cmp.l   4(%a6),%d4
+        bne.s   5f
+        move.l  8(%a6),%d0                        | unchanged: as last block
+        move.l  12(%a6),%d1
+        bra.s   4f
+5:      move.l  %d7,(%a6)
+        move.l  %d4,4(%a6)
+        btst    #8,%d4
+        beq.s   6f
+        moveq   #0,%d0                            | off the main bus
+        moveq   #0,%d1
+        bra.s   3f
+6:      add.l   %d0,%d1
         beq.s   3f                                | both zero, and so is d0
         moveq   #15,%d2
         lsl.l   %d2,%d0
@@ -711,12 +755,12 @@ vs_body:
         swap    %d1
         clr.w   %d1                               | g, Q31
         sub.l   %d0,%d1                           | cR
-3:      mvz.b   (%a0,%d5.l),%d2                   | owning track
-        move.l  48(%a5,%d2.l*4),%d4               | its shp_mod entry (elemod 1.5)
-        btst    #8,%d4
-        beq.s   4f
+3:      btst    #9,%d4
+        beq.s   7f
         neg.l   %d0                               | POL: the voice inverted
         neg.l   %d1
+7:      move.l  %d0,8(%a6)
+        move.l  %d1,12(%a6)
 4:      move.l  %d0,(%a4,%d3.l)
         move.l  %d1,4(%a4,%d3.l)
         addq.l  #2,%a1
@@ -909,19 +953,12 @@ vs_body:
         lea     FRAMES*RXSTRIDE(%a2),%a5          | the run's end
         move.l  (%a2),%d0                         | x, A
         move.l  4(%a2),%d1                        | x, B
-8:      .irp    i,0,1,2,3,4,5,6,7
-        mac.l   %d0,%d7,%acc2
-        mac.l   %d1,%a4,%acc3
-        mac.l   %d3,%a1,%acc2
-        mac.l   %d2,%a6,%acc3
-        move.l  %d0,%d3                           | x1 = x, A
-        move.l  %d1,%d2                           | x1 = x, B
-        mac.l   %d4,%d6,RXSTRIDE*(\i+1)(%a2),%d0,%acc2
-        mac.l   %d5,%a3,RXSTRIDE*(\i+1)+4(%a2),%d1,%acc3
-        movclr.l %acc2,%d4                        | y, A
-        movclr.l %acc3,%d5                        | y, B
-        move.l  %d4,RXSTRIDE*\i(%a2)
-        move.l  %d5,RXSTRIDE*\i+4(%a2)
+        | 1.7: x and x1 trade registers each frame (A d0/d3, B d1/d2), the
+        | next x loaded over the x1 just used, so no moves; eight frames a
+        | run leave them where the run started.
+8:      .irp    i,0,2,4,6
+        p1f     \i, %d0, %d3, %d1, %d2
+        p1f     (\i+1), %d3, %d0, %d2, %d1
         .endr
         lea     8*RXSTRIDE(%a2),%a2
         cmpa.l  %a5,%a2
@@ -988,44 +1025,98 @@ filter_single:
         | saturating movclr clamps the result at full scale. The voices are
         | subtracted because the PRE pair is inverted against the analog bus,
         | as the consumer's msac of the returns reflects (measured against
-        | stock over USB, 2026-09-28). Each (cL, cR) loads during the multiply
-        | before it; the last load reads the word past the table, unused.
+        | stock over USB, 2026-09-28).
+        |
+        | 1.7: two frames at a time, A in acc0/acc1 and B (the next frame) in
+        | acc2/acc3, so each (cL, cR) loads once for both. Each accumulator
+        | takes the same terms in the same order as 1.6's frame-by-frame sum,
+        | so every output word is the same. Slot s's (yA, yB, cL, cR) are in
+        | d0-d3 for even s and d4-d7 for odd s, the next slot's loading during
+        | the four multiplies of this one; the last slot's loads read the
+        | words past the slots and the table, unused.
         move.l  OUT_IDX,%d0
         moveq   #11,%d1
         lsl.l   %d1,%d0
         add.l   #OUT_RING+OUT_PRE,%d0
         move.l  %d0,%a1
+        .if     P_TIMING == 0
+        | 1.7: with every (cL, cR) zero - no voice on the main bus with its
+        | VCA words up - each term adds nothing, and the sum only takes each
+        | PRE word through its accumulator and back: (w << 8) >> 8, the word
+        | with its top byte cleared. That is done directly, without the
+        | multiplies. (The timing build keeps the full sum, for its counters.)
+        lea     COEF(%sp),%a4
+        moveq   #0,%d0
+        moveq   #15,%d1
+1:      or.l    (%a4)+,%d0
+        subq.l  #1,%d1
+        bpl.s   1b
+        tst.l   %d0
+        bne.s   2f
+        move.l  #0x00ffffff,%d2
+        moveq   #FRAMES-1,%d5
+3:      move.l  (%a1),%d0
+        and.l   %d2,%d0
+        move.l  %d0,(%a1)+
+        move.l  (%a1),%d0
+        and.l   %d2,%d0
+        move.l  %d0,(%a1)
+        lea     OUT_STRIDE-4(%a1),%a1
+        subq.l  #1,%d5
+        bpl.s   3b
+        bra.w   10f
+2:
+        .endif
         lea     RXBUF+8,%a3
         lea     COEF(%sp),%a4                     | the filter used a4
-        moveq   #FRAMES-1,%d5
-4:      move.l  %a4,%a2
-        move.l  (%a1),%d0
+        lea     FRAMES*RXSTRIDE(%a3),%a5          | the end
+4:      move.l  (%a1),%d0
         lsl.l   #8,%d0
-        move.l  %d0,%acc0                         | PRE L, Q31
+        move.l  %d0,%acc0                         | PRE L, A, Q31
         move.l  4(%a1),%d0
         lsl.l   #8,%d0
-        move.l  %d0,%acc1                         | PRE R, Q31
-        move.l  (%a2)+,%d1                        | cL, slot 0
-        .irp    i,0,1,2,3,4,5,6,7
-        move.l  4*\i(%a3),%d0                     | y
-        msac.l  %d0,%d1,(%a2)+,%d1,%acc0          | L; d1 = cR
-        msac.l  %d0,%d1,(%a2)+,%d1,%acc1          | R; d1 = the next cL
+        move.l  %d0,%acc1                         | PRE R, A
+        move.l  OUT_STRIDE(%a1),%d0
+        lsl.l   #8,%d0
+        move.l  %d0,%acc2                         | PRE L, B
+        move.l  OUT_STRIDE+4(%a1),%d0
+        lsl.l   #8,%d0
+        move.l  %d0,%acc3                         | PRE R, B
+        move.l  (%a3),%d0                         | yA, slot 0
+        move.l  RXSTRIDE(%a3),%d1                 | yB
+        move.l  (%a4),%d2                         | cL
+        move.l  4(%a4),%d3                        | cR
+        .irp    i,0,2,4,6
+        msac.l  %d0,%d2,4*(\i+1)(%a3),%d4,%acc0
+        msac.l  %d1,%d2,RXSTRIDE+4*(\i+1)(%a3),%d5,%acc2
+        msac.l  %d0,%d3,8*(\i+1)(%a4),%d6,%acc1
+        msac.l  %d1,%d3,8*(\i+1)+4(%a4),%d7,%acc3
+        msac.l  %d4,%d6,4*(\i+2)(%a3),%d0,%acc0
+        msac.l  %d5,%d6,RXSTRIDE+4*(\i+2)(%a3),%d1,%acc2
+        msac.l  %d4,%d7,8*(\i+2)(%a4),%d2,%acc1
+        msac.l  %d5,%d7,8*(\i+2)+4(%a4),%d3,%acc3
         .endr
-        movclr.l %acc0,%d2
-        movclr.l %acc1,%d3
+        movclr.l %acc0,%d4
+        movclr.l %acc1,%d5
+        movclr.l %acc2,%d6
+        movclr.l %acc3,%d7
         .if     P_TIMING
-        .irp    side,%d2,%d3
+        .irp    side,%d4,%d5,%d6,%d7
         tpeak   \side
         .endr
         .endif
-        lsr.l   #8,%d2
-        move.l  %d2,(%a1)+
-        lsr.l   #8,%d3
-        move.l  %d3,(%a1)+
-        lea     OUT_STRIDE-8(%a1),%a1
-        lea     RXSTRIDE(%a3),%a3
-        subq.l  #1,%d5
-        bpl.w   4b
+        lsr.l   #8,%d4
+        move.l  %d4,(%a1)
+        lsr.l   #8,%d5
+        move.l  %d5,4(%a1)
+        lsr.l   #8,%d6
+        move.l  %d6,OUT_STRIDE(%a1)
+        lsr.l   #8,%d7
+        move.l  %d7,OUT_STRIDE+4(%a1)
+        lea     2*OUT_STRIDE(%a1),%a1
+        lea     2*RXSTRIDE(%a3),%a3
+        cmpa.l  %a5,%a3
+        bne.w   4b
 10:
 
         move.l  (%sp)+,%d0
@@ -2059,6 +2150,13 @@ mp_t0:  .long   0
         | the entry they were worked out from.
 flt_coef:
         .space  8 * 12
+        | pan_cache (1.7): per physical voice, the inputs of its last (cL, cR)
+        | - key wL << 16 | wR, aux slot | off << 8 | POL << 9 - and the
+        | result. aux starts at -1, which no aux is.
+pan_cache:
+        .rept   8
+        .long   0, -1, 0, 0
+        .endr
 flt_key:
         .rept   8
         .long   -1
@@ -2277,19 +2375,40 @@ bq_coef:
         | bq_run: after the 1-pole pass, each slot with bq_on set through its
         | biquad, in place, direct form I:
         |   y = b0 x + b1 x1 + b2 x2 - a1 y1 - a2 y2
-        | five multiplies a frame, summed at half scale and doubled, 32 frames in four runs of eight; the last
-        | run's loads read the words past the buffer, unused. A slot without
+        | five multiplies a frame, summed at half scale and doubled, the 32
+        | frames unrolled (1.7). A slot without
         | one keeps its state on the signal, every term its last sample, so
         | turning one on starts from there. From vs_body, which saved every
         | register; clobbers all but sp.
+        | bqf: one frame of bq_run (1.7), x_i, x_i-1, x_i-2, y_i-1 and y_i-2 by
+        | register. Fully unrolled over the 32 frames, the five registers
+        | rotate (x through d0, d1, d2; y through d3, d4) in place of 1.6's
+        | three moves a frame: the next x loads over x_i-2 once its multiply
+        | is issued, y over y_i-2. The same multiply-accumulates in the same
+        | order as 1.6's frame, so the same output.
+        .macro  bqf i, x, xa, xb, ya, yb, ld=1
+        mac.l   \x,%d5,%acc2
+        mac.l   \xa,%d6,%acc2
+        mac.l   \xb,%d7,%acc2
+        mac.l   \ya,%a3,%acc2
+        .if     \ld
+        mac.l   \yb,%a4,RXSTRIDE*(\i+1)(%a2),\xb,%acc2
+        .else
+        mac.l   \yb,%a4,%acc2
+        .endif
+        movclr.l %acc2,\yb                        | y / 2
+        add.l   \yb,\yb
+        sats.l  \yb                               | y, saturated
+        move.l  \yb,RXSTRIDE*\i(%a2)
+        .endm
+
         .align  2
 bq_run:
         lea     bq_on,%a6
         lea     bq_state,%a0
         lea     bq_coefs,%a1
         lea     RXBUF+8,%a2
-1:      move.l  %a2,-(%sp)                        | the slot's column
-        tst.b   (%a6)
+1:      tst.b   (%a6)
         bne.s   2f
         move.l  (FRAMES-1)*RXSTRIDE(%a2),%d0
         move.l  %d0,(%a0)
@@ -2302,35 +2421,26 @@ bq_run:
         move.l  8(%a1),%d7                        | b2
         move.l  12(%a1),%a3                       | -a1
         move.l  16(%a1),%a4                       | -a2
-        move.l  (%a0),%d1                         | x1
-        move.l  4(%a0),%d2                        | x2
-        move.l  8(%a0),%d3                        | y1
-        move.l  12(%a0),%d4                       | y2
-        lea     FRAMES*RXSTRIDE(%a2),%a5          | the column's end
         move.l  (%a2),%d0                         | x
-3:      .irp    i,0,1,2,3,4,5,6,7
-        mac.l   %d0,%d5,%acc2
-        mac.l   %d1,%d6,%acc2
-        mac.l   %d2,%d7,%acc2
-        move.l  %d1,%d2                           | x2 = x1
-        move.l  %d0,%d1                           | x1 = x
-        mac.l   %d3,%a3,%acc2
-        mac.l   %d4,%a4,RXSTRIDE*(\i+1)(%a2),%d0,%acc2
-        move.l  %d3,%d4                           | y2 = y1
-        movclr.l %acc2,%d3                        | y / 2
-        add.l   %d3,%d3
-        sats.l  %d3                               | y1 = y, saturated
-        move.l  %d3,RXSTRIDE*\i(%a2)
+        move.l  (%a0),%d2                         | x1
+        move.l  4(%a0),%d1                        | x2
+        move.l  8(%a0),%d4                        | y1
+        move.l  12(%a0),%d3                       | y2
+        .irp    i,0,6,12,18,24
+        bqf     \i,     %d0, %d2, %d1, %d4, %d3
+        bqf     (\i+1), %d1, %d0, %d2, %d3, %d4
+        bqf     (\i+2), %d2, %d1, %d0, %d4, %d3
+        bqf     (\i+3), %d0, %d2, %d1, %d3, %d4
+        bqf     (\i+4), %d1, %d0, %d2, %d4, %d3
+        bqf     (\i+5), %d2, %d1, %d0, %d3, %d4
         .endr
-        lea     8*RXSTRIDE(%a2),%a2
-        cmpa.l  %a5,%a2
-        bne.w   3b
-        move.l  %d1,(%a0)
-        move.l  %d2,4(%a0)
-        move.l  %d3,8(%a0)
-        move.l  %d4,12(%a0)
-5:      move.l  (%sp)+,%a2
-        addq.l  #4,%a2                            | the next slot's column
+        bqf     30, %d0, %d2, %d1, %d4, %d3
+        bqf     31, %d1, %d0, %d2, %d3, %d4, 0
+        move.l  %d1,(%a0)                         | x1 = x 31
+        move.l  %d0,4(%a0)                        | x2 = x 30
+        move.l  %d4,8(%a0)                        | y1 = y 31
+        move.l  %d3,12(%a0)                       | y2 = y 30
+5:      addq.l  #4,%a2                            | the next slot's column
         lea     16(%a0),%a0
         lea     20(%a1),%a1
         addq.l  #1,%a6
