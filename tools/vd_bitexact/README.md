@@ -18,3 +18,13 @@ instructions executed per block in fixed scenarios. These are instructions, not 
 CPU reading.
 
     tools/vd_bitexact/run.sh [ref] [cases]
+
+## In the emulator: mk_selfcheck.py
+
+    python3 tools/vd_bitexact/mk_selfcheck.py OLD.s voice-dac/os1.74/voice-dac.s OUT.s
+
+This writes a debug source (emulator only, never released) whose vs_body runs OLD's pan pass through
+its sum on each block's inputs, keeps what it wrote, puts the inputs back, then runs the new code on the
+same inputs and compares. The counters `voice_dac_sc_n`, `_sc_bad`, `_sc_where` and `_sc_blk` (see the
+script) are in the build's map, so a timing difference between two images can be told apart from a
+difference in the values.
