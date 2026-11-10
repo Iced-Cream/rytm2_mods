@@ -159,8 +159,10 @@
         .equ    ID_RES,         13
         .equ    ID_ATK,         7                 | Error, renamed
         .equ    ID_SUS,         14                | Error, renamed
-        .equ    ID_POL,         457               | CB TEST's CB_OSC_SELECT, renamed: the
-                                                  | TEST machines are hidden
+        .equ    ID_POL,         __knobs           | POL's knob id: the linker gives the mod
+                                                  | its own run of knob ids ("knobs": 1),
+                                                  | in place of record 457 (CB TEST, slot 52),
+                                                  | which core 0.13 gives to mod machines
         .equ    ID_STOCK_PAN,   62                | its encoder feel, for ATK and SUS
         .equ    ID_STOCK_FINE,  40                | SAMPLE FINE: its dial, dotted at 0
         .equ    PI_DRAW,        0x24              | RAM record: the knob's draw callback
@@ -1223,12 +1225,12 @@ page_hpf_off:
         .else
         .equ    ID_DEPK,        0                 | without DEP: an empty slot
         .endif
-        | core_params: the page's ids, 5, 7, 11..14 and 457
-        .globl  voice_dac_p5, voice_dac_p7, voice_dac_p11, voice_dac_p457
+        | core_params: the page's ids, 5, 7, 11..14 and POL's knob id
+        .globl  voice_dac_p5, voice_dac_p7, voice_dac_p11, voice_dac_pol
 voice_dac_p5:   .long   ID_FRQ, ID_FRQ, vd_param_get, vd_param_delta, vd_param_text
 voice_dac_p7:   .long   ID_ATK, ID_ATK, vd_param_get, vd_param_delta, vd_param_text
 voice_dac_p11:  .long   ID_TYP, ID_SUS, vd_param_get, vd_param_delta, vd_param_text
-voice_dac_p457: .long   ID_POL, ID_POL, vd_param_get, vd_param_delta, vd_param_text
+voice_dac_pol: .long   ID_POL, ID_POL, vd_param_get, vd_param_delta, vd_param_text
         | core_lock_params (elemod 1.5): {field, knob id, min, max, short
         | name, name, category}. The short names are the page's labels.
         .globl  voice_dac_lock_typ, voice_dac_lock_frq, voice_dac_lock_res
@@ -1265,6 +1267,12 @@ voice_dac_lock_dep:
         .word   0, DEP_FULL
         .long   txt_dep_short, txt_dep_long, txt_cat
         .endif
+        | core_knob_looks (core 0.13): POL draws as CB TEST's switch, 457's
+        | knob and range (0..1), as it did on record 457 itself.
+        .globl  voice_dac_looks
+        .align  2
+voice_dac_looks:
+        .long   ID_POL, ID_POL, 457, 0, 0, 0
 txt_cat:
         .asciz  "DAC"
         .align  2
