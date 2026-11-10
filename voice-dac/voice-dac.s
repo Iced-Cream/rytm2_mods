@@ -162,7 +162,7 @@
         .equ    ID_POL,         __knobs           | POL's knob id: the linker gives the mod
                                                   | its own run of knob ids ("knobs": 1),
                                                   | in place of record 457 (CB TEST, slot 52),
-                                                  | which core 0.12 gives to mod machines
+                                                  | which core 0.13 gives to mod machines
         .equ    ID_STOCK_PAN,   62                | its encoder feel, for ATK and SUS
         .equ    ID_STOCK_FINE,  40                | SAMPLE FINE: its dial, dotted at 0
         .equ    PI_DRAW,        0x24              | RAM record: the knob's draw callback
@@ -1267,7 +1267,7 @@ voice_dac_lock_dep:
         .word   0, DEP_FULL
         .long   txt_dep_short, txt_dep_long, txt_cat
         .endif
-        | core_knob_looks (core 0.12): POL draws as CB TEST's switch, 457's
+        | core_knob_looks (core 0.13): POL draws as CB TEST's switch, 457's
         | knob and range (0..1), as it did on record 457 itself.
         .globl  voice_dac_looks
         .align  2

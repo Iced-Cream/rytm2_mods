@@ -320,12 +320,12 @@ yet run on a unit.
 - Hardware: on an Analog Rytm MKII, 2026-10-14, in the full build (core-ar2 with all eleven ports): DAC SUM on and off, compared by
   ear with rytm-mods' own build: the same on both.
 
-### 1.6: POL on a mod-kept id (core 0.12)
+### 1.6: POL on a mod-kept id (core 0.13)
 
-Core-ar2 0.12 gives machine slots 44..52 to mod machines, so CB TEST's record 457, which POL borrowed
+Core-ar2 0.13 gives machine slots 44..52 to mod machines, so CB TEST's record 457, which POL borrowed
 (slot 52), is no longer ours. POL's knob id is now the mod's own `__knobs` (`"knobs": 1`; the linker allocates it from 555 up), with its
 name and short name from the `core_lock_params` entry; the two `ptr` sites that renamed record 457's
 texts are gone (both ports). The other ids are unchanged (5, 7, 11..14: stock ids and dead Error
-records). Same behaviour and sound. Needs core-ar2 0.12 (`"resources": {"core": "0.12"}`). Not yet
+records). Same behaviour and sound. Needs core-ar2 0.13 (`"resources": {"core": "0.13"}`). Not yet
 linked or run in the emulator or on the unit.
-POL keeps its switch look through core 0.12's `core_knob_looks` (`voice_dac_looks`: it borrows 457's knob and 0..1 range), so the page draws as in 1.5.
+POL keeps its switch look through core 0.13's `core_knob_looks` (`voice_dac_looks`: it borrows 457's knob and 0..1 range), so the page draws as in 1.5.
