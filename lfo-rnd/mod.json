@@ -1,11 +1,11 @@
 {
  "id": "lfo-rnd",
- "version": "1.3",
+ "version": "1.4",
  "title": "LFO RND page",
  "category": "Sound",
  "author": "MrScruff (rytm-mods); elemod port: Iced-Cream",
  "license": "GPL-2.0-only",
- "description": "A second LFO page, LFO RND, reached by pressing the LFO page key again: two random modifiers per sound, each a destination (DS1/DS2, one of 16, chosen from stock's LFO DST list) and a depth (DP1/DP2, 0..64 in 16 steps). On every note trig each modifier draws a random offset for its destination, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound through core-ar2 0.2's mod storage (one 16-bit sound field), so the sound's stock bytes stay stock; sounds saved by lfo-rnd 1.0 keep their settings. Port of rytm-mods 0004-lfo-rnd. From 1.2 the page goes through core-ar2 0.4's page tables and page-key lists (needs core 0.4, OS 1.74 only). From 1.3 (core-ar2 0.9) the four settings are four 4-bit sound fields, each a lockable parameter registered in core_lock_params on its page knob: DS1 and DS2 are lockable (p-locks, scene locks, MIDI) and step without smoothing; DP1 and DP2 are also LFO, velocity and aftertouch destinations (RND:Random 1 Depth, RND:Random 2 Depth). At each note's start the audio interrupt takes the four as core plays them (core_param_int: the sound's value, the trig's p-lock or the scene's lock, plus the performances, the LFO and the routes), so a p-locked or modulated depth or destination draws that note's offset. Settings saved by 1.1 and 1.2 (one 16-bit field) load as the defaults; lfo-rnd 1.0's word still loads (needs core 0.9).",
+ "description": "A second LFO page, LFO RND, reached by pressing the LFO page key again: two random modifiers per sound, each a destination (DS1/DS2, one of 16, chosen from stock's LFO DST list) and a depth (DP1/DP2, 0..64 in 16 steps). On every note trig each modifier draws a random offset for its destination, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound through core-ar2 0.2's mod storage (one 16-bit sound field), so the sound's stock bytes stay stock; sounds saved by lfo-rnd 1.0 keep their settings. Port of rytm-mods 0004-lfo-rnd. From 1.2 the page goes through core-ar2 0.4's page tables and page-key lists (needs core 0.4, OS 1.74 only). From 1.3 (core-ar2 0.9) the four settings are four 4-bit sound fields, each a lockable parameter registered in core_lock_params on its page knob: DS1 and DS2 are lockable (p-locks, scene locks, MIDI) and step without smoothing; DP1 and DP2 are also LFO, velocity and aftertouch destinations (RND:Random 1 Depth, RND:Random 2 Depth). At each note's start the audio interrupt takes the four as core plays them (core_param_int: the sound's value, the trig's p-lock or the scene's lock, plus the performances, the LFO and the routes), so a p-locked or modulated depth or destination draws that note's offset. Settings saved by 1.1 and 1.2 (one 16-bit field) load as the defaults; lfo-rnd 1.0's word still loads (needs core 0.9). From 1.4 (core-ar2 0.13) the page's four knobs are the mod's own knob ids (\"knobs\": 4) in place of stock ids 1..4: no stock parameter record is patched, DS1 and DS2 draw as stock's LFO DST knob and DP1 and DP2 as a dial through core_knob_looks, and the knob draw site at 0x400a85e8, which core-ar2 0.13 takes, is gone, so it links with core-ar2 0.13 and later, flashed and from the +Drive (needs core 0.13).",
  "device": "analog-rytm-mk2",
  "os": "1.73",
  "sources": [
@@ -19,16 +19,34 @@
    "target": "lfo_rnd_list_same_gate"
   },
   {
-   "addr": "0x40039d9a",
-   "stock": "4eb940006ea8",
+   "addr": "0x40039d94",
+   "stock": "2e3018242f004eb940006ea8",
    "op": "jmp",
    "target": "lfo_rnd_list_new_gate"
+  },
+  {
+   "addr": "0x40039fbe",
+   "stock": "20330824028000010000",
+   "op": "jmp",
+   "target": "lfo_rnd_turn_flag_gate"
+  },
+  {
+   "addr": "0x4003a224",
+   "stock": "20330824028000010000",
+   "op": "jmp",
+   "target": "lfo_rnd_delta_flag_gate"
   },
   {
    "addr": "0x4003a5f2",
    "stock": "4eb940006ea8",
    "op": "jmp",
    "target": "lfo_rnd_knob_cidx_gate"
+  },
+  {
+   "addr": "0x4003a890",
+   "stock": "20300824028000010000",
+   "op": "jmp",
+   "target": "lfo_rnd_push_flag_gate"
   },
   {
    "addr": "0x4004aec6",
@@ -41,12 +59,6 @@
    "stock": "2945000c29400018",
    "op": "jmp",
    "target": "lfo_rnd_trig_cfg_gate"
-  },
-  {
-   "addr": "0x400a857c",
-   "stock": "4feffff048d7003c",
-   "op": "jmp",
-   "target": "lfo_rnd_knob_draw_gate"
   },
   {
    "addr": "0x400a8dfa",
@@ -65,138 +77,6 @@
    "stock": "4eb94009e790",
    "op": "jmp",
    "target": "lfo_rnd_audio_gate"
-  },
-  {
-   "addr": "0x401bf950",
-   "stock": "ffffffff",
-   "op": "bytes",
-   "new": "00000000"
-  },
-  {
-   "addr": "0x401bf958",
-   "stock": "00000000",
-   "op": "bytes",
-   "new": "00007f00"
-  },
-  {
-   "addr": "0x401bf970",
-   "stock": "00000000",
-   "op": "bytes",
-   "new": "00010000"
-  },
-  {
-   "addr": "0x401bf974",
-   "stock": "402405ea",
-   "op": "ptr",
-   "target": "lfo_rnd_str_r1dst_l"
-  },
-  {
-   "addr": "0x401bf978",
-   "stock": "4024084f",
-   "op": "ptr",
-   "target": "lfo_rnd_str_group"
-  },
-  {
-   "addr": "0x401bf97c",
-   "stock": "40236f0d",
-   "op": "ptr",
-   "target": "lfo_rnd_str_r1dst"
-  },
-  {
-   "addr": "0x401bf984",
-   "stock": "ffffffff",
-   "op": "bytes",
-   "new": "00000000"
-  },
-  {
-   "addr": "0x401bf98c",
-   "stock": "00000000",
-   "op": "bytes",
-   "new": "00007f00"
-  },
-  {
-   "addr": "0x401bf9a8",
-   "stock": "402405ea",
-   "op": "ptr",
-   "target": "lfo_rnd_str_r1dep_l"
-  },
-  {
-   "addr": "0x401bf9ac",
-   "stock": "4024084f",
-   "op": "ptr",
-   "target": "lfo_rnd_str_group"
-  },
-  {
-   "addr": "0x401bf9b0",
-   "stock": "40236f0d",
-   "op": "ptr",
-   "target": "lfo_rnd_str_r1dep"
-  },
-  {
-   "addr": "0x401bf9b8",
-   "stock": "ffffffff",
-   "op": "bytes",
-   "new": "00000000"
-  },
-  {
-   "addr": "0x401bf9c0",
-   "stock": "00000000",
-   "op": "bytes",
-   "new": "00007f00"
-  },
-  {
-   "addr": "0x401bf9d8",
-   "stock": "00000000",
-   "op": "bytes",
-   "new": "00010000"
-  },
-  {
-   "addr": "0x401bf9dc",
-   "stock": "402405ea",
-   "op": "ptr",
-   "target": "lfo_rnd_str_r2dst_l"
-  },
-  {
-   "addr": "0x401bf9e0",
-   "stock": "4024084f",
-   "op": "ptr",
-   "target": "lfo_rnd_str_group"
-  },
-  {
-   "addr": "0x401bf9e4",
-   "stock": "40236f0d",
-   "op": "ptr",
-   "target": "lfo_rnd_str_r2dst"
-  },
-  {
-   "addr": "0x401bf9ec",
-   "stock": "ffffffff",
-   "op": "bytes",
-   "new": "00000000"
-  },
-  {
-   "addr": "0x401bf9f4",
-   "stock": "00000000",
-   "op": "bytes",
-   "new": "00007f00"
-  },
-  {
-   "addr": "0x401bfa10",
-   "stock": "402405ea",
-   "op": "ptr",
-   "target": "lfo_rnd_str_r2dep_l"
-  },
-  {
-   "addr": "0x401bfa14",
-   "stock": "4024084f",
-   "op": "ptr",
-   "target": "lfo_rnd_str_group"
-  },
-  {
-   "addr": "0x401bfa18",
-   "stock": "40236f0d",
-   "op": "ptr",
-   "target": "lfo_rnd_str_r2dep"
   }
  ],
  "storage": [
@@ -238,7 +118,7 @@
   }
  ],
  "resources": {
-  "core": "0.9"
+  "core": "0.13"
  },
  "requires": [
   "core"
@@ -256,16 +136,34 @@
      "target": "lfo_rnd_list_same_gate"
     },
     {
-     "addr": "0x40039d9a",
-     "stock": "4eb940006ea8",
+     "addr": "0x40039d94",
+     "stock": "2e3018242f004eb940006ea8",
      "op": "jmp",
      "target": "lfo_rnd_list_new_gate"
+    },
+    {
+     "addr": "0x40039fbe",
+     "stock": "20330824028000010000",
+     "op": "jmp",
+     "target": "lfo_rnd_turn_flag_gate"
+    },
+    {
+     "addr": "0x4003a224",
+     "stock": "20330824028000010000",
+     "op": "jmp",
+     "target": "lfo_rnd_delta_flag_gate"
     },
     {
      "addr": "0x4003a5f2",
      "stock": "4eb940006ea8",
      "op": "jmp",
      "target": "lfo_rnd_knob_cidx_gate"
+    },
+    {
+     "addr": "0x4003a890",
+     "stock": "20300824028000010000",
+     "op": "jmp",
+     "target": "lfo_rnd_push_flag_gate"
     },
     {
      "addr": "0x4004aec6",
@@ -278,12 +176,6 @@
      "stock": "2945000c29400018",
      "op": "jmp",
      "target": "lfo_rnd_trig_cfg_gate"
-    },
-    {
-     "addr": "0x400a85e8",
-     "stock": "4feffff048d7003c",
-     "op": "jmp",
-     "target": "lfo_rnd_knob_draw_gate"
     },
     {
      "addr": "0x400a8e66",
@@ -302,138 +194,6 @@
      "stock": "4eb94009e7fc",
      "op": "jmp",
      "target": "lfo_rnd_audio_gate"
-    },
-    {
-     "addr": "0x401bfc00",
-     "stock": "ffffffff",
-     "op": "bytes",
-     "new": "00000000"
-    },
-    {
-     "addr": "0x401bfc08",
-     "stock": "00000000",
-     "op": "bytes",
-     "new": "00007f00"
-    },
-    {
-     "addr": "0x401bfc20",
-     "stock": "00000000",
-     "op": "bytes",
-     "new": "00010000"
-    },
-    {
-     "addr": "0x401bfc24",
-     "stock": "4024091a",
-     "op": "ptr",
-     "target": "lfo_rnd_str_r1dst_l"
-    },
-    {
-     "addr": "0x401bfc28",
-     "stock": "40240b7f",
-     "op": "ptr",
-     "target": "lfo_rnd_str_group"
-    },
-    {
-     "addr": "0x401bfc2c",
-     "stock": "4023723d",
-     "op": "ptr",
-     "target": "lfo_rnd_str_r1dst"
-    },
-    {
-     "addr": "0x401bfc34",
-     "stock": "ffffffff",
-     "op": "bytes",
-     "new": "00000000"
-    },
-    {
-     "addr": "0x401bfc3c",
-     "stock": "00000000",
-     "op": "bytes",
-     "new": "00007f00"
-    },
-    {
-     "addr": "0x401bfc58",
-     "stock": "4024091a",
-     "op": "ptr",
-     "target": "lfo_rnd_str_r1dep_l"
-    },
-    {
-     "addr": "0x401bfc5c",
-     "stock": "40240b7f",
-     "op": "ptr",
-     "target": "lfo_rnd_str_group"
-    },
-    {
-     "addr": "0x401bfc60",
-     "stock": "4023723d",
-     "op": "ptr",
-     "target": "lfo_rnd_str_r1dep"
-    },
-    {
-     "addr": "0x401bfc68",
-     "stock": "ffffffff",
-     "op": "bytes",
-     "new": "00000000"
-    },
-    {
-     "addr": "0x401bfc70",
-     "stock": "00000000",
-     "op": "bytes",
-     "new": "00007f00"
-    },
-    {
-     "addr": "0x401bfc88",
-     "stock": "00000000",
-     "op": "bytes",
-     "new": "00010000"
-    },
-    {
-     "addr": "0x401bfc8c",
-     "stock": "4024091a",
-     "op": "ptr",
-     "target": "lfo_rnd_str_r2dst_l"
-    },
-    {
-     "addr": "0x401bfc90",
-     "stock": "40240b7f",
-     "op": "ptr",
-     "target": "lfo_rnd_str_group"
-    },
-    {
-     "addr": "0x401bfc94",
-     "stock": "4023723d",
-     "op": "ptr",
-     "target": "lfo_rnd_str_r2dst"
-    },
-    {
-     "addr": "0x401bfc9c",
-     "stock": "ffffffff",
-     "op": "bytes",
-     "new": "00000000"
-    },
-    {
-     "addr": "0x401bfca4",
-     "stock": "00000000",
-     "op": "bytes",
-     "new": "00007f00"
-    },
-    {
-     "addr": "0x401bfcc0",
-     "stock": "4024091a",
-     "op": "ptr",
-     "target": "lfo_rnd_str_r2dep_l"
-    },
-    {
-     "addr": "0x401bfcc4",
-     "stock": "40240b7f",
-     "op": "ptr",
-     "target": "lfo_rnd_str_group"
-    },
-    {
-     "addr": "0x401bfcc8",
-     "stock": "4023723d",
-     "op": "ptr",
-     "target": "lfo_rnd_str_r2dep"
     }
    ]
   }
@@ -529,6 +289,59 @@
      0
     ]
    ]
+  },
+  {
+   "to": "core_knob_looks",
+   "order": 12,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:lfo_rnd_looks_ds1",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_knob_looks",
+   "order": 12,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:lfo_rnd_looks_dp1",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_knob_looks",
+   "order": 12,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:lfo_rnd_looks_ds2",
+     0
+    ]
+   ]
+  },
+  {
+   "to": "core_knob_looks",
+   "order": 12,
+   "data": "00000000",
+   "relocs": [
+    [
+     0,
+     "abs32",
+     "sym:lfo_rnd_looks_dp2",
+     0
+    ]
+   ]
   }
- ]
+ ],
+ "knobs": 4
 }

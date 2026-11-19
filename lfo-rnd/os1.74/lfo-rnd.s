@@ -32,8 +32,11 @@
         | be p-locked, scene-locked, reached over MIDI and modulated (elemod
         | 1.3, needs core-ar2 0.9).
         |
-        | Parameter ids 1..4 are dead Error records, renamed by registry patches.
-        | Field = id - 1, so the nibble shift is field * 4 and odd fields are depths.
+        | The page's four knobs are the mod's own knob ids, __knobs + 0..3 (elemod
+        | 1.4, "knobs": 4; 1.3 and rytm-mods borrowed stock ids 1..4, dead Error
+        | records renamed by registry patches). Field = id - __knobs, so the
+        | nibble shift is field * 4 and odd fields are depths. Their labels and
+        | names are core_lock_params', their looks core_knob_looks' (below).
         |
         | lfo-rnd 1.0 and rytm-mods kept the same word in the sound's parameter
         | word at sound index 0 (live sound +0x14, storage slot 41), which no stock
@@ -49,7 +52,9 @@
 
         .equ    PAGE_RND,       12
         .equ    PAGE_LFO,       3
-        .equ    ID_FIRST,       1
+        .equ    ID_FIRST,       __knobs           | elemod 1.4: the linker's run of 4
+        .equ    LOOK_DST,       67                | stock id 67, LFO DST: its knob draws the name
+        .equ    LOOK_DEP,       2                 | stock id 2: the dial DP1 had in 1.3
         .equ    OFF_PARAMS,     0x14              | live sound parameter array
         .equ    OFF_MACHINE,    0x68              | live sound machine byte
         .equ    PARAM_ROM,      0x401bfbc8        | 0x34-byte ROM parameter records
@@ -225,20 +230,19 @@ setting_of:
 1:      rts
 
         | ------------------------------------------------------------------
-        | get(id, *value), core_params: ids 1..4 for the dials.
+        | get(id, *value), core_params: the four knob ids for the dials.
         |
-        | Values are 8.8 on the 0..127 scale. A destination shows as its list
-        | position times eight, which spaces its sixteen positions evenly across
-        | the dial. A depth shows as its stop: the sixteen depths spread evenly
-        | over the knob's travel, so each turn of the knob moves the needle the
-        | same distance and the knob reads as a sixteen position selector. The
-        | popup reads the setting from the sound instead, so it shows N or the
-        | destination's name (text).
+        | Values are 8.8 on the 0..127 scale. A destination answers its
+        | container index, which LFO DST's knob draws as its name. A depth shows
+        | as its stop: the sixteen depths spread evenly over the knob's travel,
+        | so each turn of the knob moves the needle the same distance and the
+        | knob reads as a sixteen position selector. The popup reads the setting
+        | from the sound instead, so it shows N or the destination's name (text).
         | ------------------------------------------------------------------
         .align  2
 lfo_rnd_get:
         move.l  4(%sp),%d0
-        subq.l  #ID_FIRST,%d0
+        sub.l   #ID_FIRST,%d0
         bsr.s   setting_of
         btst    #0,%d1
         beq.s   2f
@@ -268,7 +272,7 @@ lfo_rnd_delta:
         movem.l %d2-%d3/%a2,(%sp)                 | view 16, id 20, delta 24
         move.l  16(%sp),%a2                       | the view, for shared_mark_changed
         move.l  20(%sp),%d3
-        subq.l  #ID_FIRST,%d3                     | field
+        sub.l   #ID_FIRST,%d3                     | field
         move.l  24(%sp),%d2
         asr.l   #8,%d2                            | whole steps, sign preserved
         beq.s   7f
@@ -309,7 +313,7 @@ lfo_rnd_text:
         move.l  %d2,-(%sp)
         move.l  8(%sp),%a0
         move.l  4(%a0),%d0
-        subq.l  #ID_FIRST,%d0
+        sub.l   #ID_FIRST,%d0
         move.l  %d0,%d2                           | field
         move.l  %d0,%d1
         bsr.w   nibble                            | d0 = 0..15
@@ -366,44 +370,11 @@ dst_name:
         rts
 
         | ------------------------------------------------------------------
-        | param_knob_draw for ids 1 and 3, the two destination knobs.
-        |
-        | Entered by a jmp at the entry: (%sp) return, 4 the parameter set, 8 the id,
-        | 12 the value in 8.8, and 24/28/32 the three the field is placed by.
-        |
-        | Stock's own LFO DST callback draws exactly what these knobs want - it maps
-        | the value through the sound's parameters to a short name and draws that,
-        | with no dial - and read_gate already makes our value read as the container
-        | index it expects. So rather than draw it again here, the arguments are
-        | shuffled into the frame param_knob_draw would have built for a callback and
-        | the call is handed to lfo_dst_knob_draw.
-        |
-        | That frame is (functor, value, x, y, h, 1), written over our own argument
-        | slots in place, exactly as param_knob_draw does at 0x400a85a8. The functor
-        | slot keeps whatever it held: the invoker reads the value at its +8 and the
-        | three at +12/+16/+20 and nothing else - checked instruction by instruction -
-        | so it never looks at it.
+        | DS1 and DS2's dial: stock's LFO DST graphic (lfo_dst_knob_draw), which
+        | draws the destination's short name with no dial. elemod 1.4: through
+        | core_knob_looks (lfo_rnd_looks_ds1/_ds2, below), where 1.3 jumped from
+        | param_knob_draw's entry itself, the instructions core-ar2 0.13 takes.
         | ------------------------------------------------------------------
-        .align  2
-        .globl  lfo_rnd_knob_draw_gate
-lfo_rnd_knob_draw_gate:
-knob_draw_gate:
-        move.l  8(%sp),%d0
-        moveq   #2,%d1
-        or.l    %d1,%d0                           | 1 and 3 are the destinations
-        moveq   #3,%d1
-        cmp.l   %d1,%d0
-        bne.s   9f
-        move.l  12(%sp),8(%sp)                    | the value moves down one slot
-        move.l  24(%sp),12(%sp)
-        move.l  28(%sp),16(%sp)
-        move.l  32(%sp),20(%sp)
-        moveq   #1,%d0
-        move.l  %d0,24(%sp)
-        jmp     lfo_dst_knob_draw
-9:      lea     %sp@(-16),%sp                     | displaced
-        moveml  %d2-%d5,%sp@                      | displaced
-        jmp     param_knob_draw_body
 
         | ------------------------------------------------------------------
         | set_field(d0 = new setting 0..15, d1 = field)
@@ -485,7 +456,7 @@ pos_of:
 lfo_rnd_read_gate:
 read_gate:
         move.l  8(%sp),%d0
-        subq.l  #ID_FIRST,%d0
+        sub.l   #ID_FIRST,%d0
         moveq   #3,%d1
         cmp.l   %d1,%d0
         bhi.s   9f
@@ -511,7 +482,7 @@ read_gate:
 lfo_rnd_setter_gate:
 setter_gate:
         move.l  8(%sp),%d0
-        subq.l  #ID_FIRST,%d0
+        sub.l   #ID_FIRST,%d0
         moveq   #3,%d1
         cmp.l   %d1,%d0
         bhi.s   9f
@@ -552,11 +523,11 @@ setter_gate:
         | INDEX of the parameter the list is for - not its id - and %fp@(-88) takes
         | the vector, whose +0 and +4 are begin and end.
         |
-        | Two things have to match. The mask at %fp@(32) is 0x600 for the LFO DST list
-        | and 0x200 for MOD SETUP's, which the same constructor builds at 0x4004bab8;
-        | and the index is 0, the sound's free word, which no stock parameter uses -
-        | LFO DST's own is 4. MOD SETUP passes its route slot in that argument, and
-        | slot 0 would otherwise look exactly like ours.
+        | Three things have to match. The mask at %fp@(32) is 0x600 for the LFO DST
+        | list and 0x200 for MOD SETUP's, which the same constructor builds at
+        | 0x4004bab8; the index is -1, what core's param_container_index answers
+        | for a mod's own knob id (LFO DST's own is 4; elemod 1.4, was the 0 1.3's
+        | record patches gave ids 1..4); and list_new_gate saw DS1 or DS2 open it.
         |
         | The panel is moved to the left edge here too. Its geometry reached the view
         | before this point - x at +184, width at +188 - and stock's 49 + 79 puts it
@@ -578,7 +549,11 @@ list_filter_gate:
         move.l  #0x600,%d0                        | LFO DST's list, not MOD SETUP's
         cmp.l   %fp@(32),%d0
         bne.s   8f
-        tst.l   %fp@(20)                          | and container index 0, so ours
+        moveq   #-1,%d0                           | container index -1, a knob with
+        cmp.l   %fp@(20),%d0                      | no sound slot (elemod 1.4: was 0)
+        bne.s   8f
+        move.l  list_owner,%d0                    | and the list DS1's or DS2's
+        bsr.w   ds_of
         bne.s   8f
         move.l  %fp@(8),%a0                       | the view being built
         clr.l   LIST_X(%a0)                       | against the left edge, not the right
@@ -607,45 +582,75 @@ list_filter_gate:
         jmp     dest_list_build_resume
 
         | ------------------------------------------------------------------
+        | ds_of(d0 = a knob id) -> Z set when it is DS1's or DS2's. Clobbers d0.
+        | ------------------------------------------------------------------
+        .align  2
+ds_of:
+        sub.l   #ID_FIRST,%d0
+        bclr    #1,%d0                            | 0 (DS1) and 2 (DS2) -> 0
+        tst.l   %d0
+        rts
+
+        | ------------------------------------------------------------------
+        | cidx_of(4(%sp) = a knob id, d0 = stock's container index) -> d0
+        |
+        | A mod's own knob id has container index -1 (core's
+        | param_container_index), as has the list DS1 or DS2 opens. So that only
+        | the knob whose list it is matches it, the page's other three answer
+        | -2, which no list holds: DS1 and DS2 do not share a list, and DP1 and
+        | DP2 cancel it on release as any other knob does (elemod 1.4; in 1.3
+        | they shared index 0 from the record patches). Changes only d0.
+        | ------------------------------------------------------------------
+        .align  2
+cidx_of:
+        move.l  %d1,-(%sp)
+        move.l  8(%sp),%d1                        | the id
+        sub.l   #ID_FIRST,%d1
+        cmpi.l  #3,%d1
+        bhi.s   9f                                | not one of ours: stock's index
+        btst    #0,%d1
+        bne.s   1f                                | DP1, DP2
+        add.l   #ID_FIRST,%d1
+        cmp.l   list_owner,%d1
+        beq.s   9f                                | the list's own DS: stock's -1
+1:      moveq   #-2,%d0
+9:      move.l  (%sp)+,%d1
+        rts
+
+        | ------------------------------------------------------------------
         | The picker's test for whether the open list is this knob's.
         |
         | Reached by a jmp over `jsr param_container_index` at 0x40039d32, with
         | the id at (%sp). Stock keeps the open list when its container index
         | matches the knob's, and cancels it and opens the knob's own otherwise.
-        | DS1 and DS2 share index 0, so turning one with the other's list up
-        | moved that list, and YES wrote the value into the list's parameter.
-        | The list does not record its parameter, so list_new_gate keeps it in
-        | list_owner; one of ours that does not own the list answers -1.
+        | DS1 and DS2 share index -1, so turning one with the other's list up
+        | would move that list, and YES would write the value into the list's
+        | parameter. The list does not record its parameter, so list_new_gate
+        | keeps it in list_owner, and cidx_of answers -2 for the other knobs.
         | ------------------------------------------------------------------
         .equ    LIST_SAME_RESUME, 0x40039d38
         .align  2
         .globl  lfo_rnd_list_same_gate
 lfo_rnd_list_same_gate:
-list_same_gate:
         jsr     param_container_index             | displaced
-        tst.l   %d0
-        bne.s   9f                                | not one of ours
-        move.l  (%sp),%d1                         | the id
-        cmp.b   list_owner,%d1
-        beq.s   9f
-        moveq   #-1,%d0
-9:      jmp     LIST_SAME_RESUME
+        move.l  (%sp),-(%sp)                      | the id
+        bsr.w   cidx_of
+        addq.l  #4,%sp
+        jmp     LIST_SAME_RESUME
 
 list_owner:                                       | the id the open list is for
-        .byte   0
+        .long   0
 
         | ------------------------------------------------------------------
-        | The knob-release test, for the two depth knobs.
+        | The knob-release test.
         |
         | Reached by a jmp over `jsr param_container_index` in the page view key
         | handler's knob-event path, with the id at (%sp) and in d4. The result is
         | kept at %fp@(-20) and read only by the release, at 0x4003aa1e: a list
         | whose container index matches the released knob's is confirmed, any
-        | other is cancelled. The four settings share container index 0, so
-        | releasing DP1 or DP2 confirmed the DS list its own press had just
-        | cancelled, and the list came back up for a moment. The depths answer
-        | -1 here, which no list holds, so their release cancels as any other
-        | knob's does. In its own section: cave2 has no room left for it.
+        | other is cancelled. Our four knobs all have index -1, as DS1's and
+        | DS2's lists do, so cidx_of gives every one but the list's own -2:
+        | releasing DP1, DP2 or the other DS cancels as any other knob's does.
         | ------------------------------------------------------------------
         .equ    KNOB_CIDX_RESUME, 0x4003a5f8
         .text                     | elemod: was .section .kgate,"ax"
@@ -654,29 +659,87 @@ list_owner:                                       | the id the open list is for
 lfo_rnd_knob_cidx_gate:
 knob_cidx_gate:
         jsr     param_container_index             | displaced
-        moveq   #2,%d1                            | DP1
-        cmp.l   %d4,%d1
-        beq.s   1f
-        moveq   #4,%d1                            | DP2
-        cmp.l   %d4,%d1
-        bne.s   9f
-1:      moveq   #-1,%d0
-9:      jmp     KNOB_CIDX_RESUME
+        move.l  %d4,-(%sp)                        | the id
+        bsr.w   cidx_of
+        addq.l  #4,%sp
+        jmp     KNOB_CIDX_RESUME
 
         | ------------------------------------------------------------------
-        | The picker, creating a list: record whose it is, for list_same_gate.
-        | Reached by a jmp over `jsr param_container_index` at 0x40039d9a, with
-        | the id at (%sp).
+        | The picker, creating a list (0x40039d94..0x40039da0): stock reads the
+        | knob's record flags, bound to its 469 records (record 0's for a mod's
+        | own id), and opens the LFO destination list when 0x10000 is set. DS1
+        | and DS2 have that flag, as 1.3's record patches gave ids 1 and 3; and
+        | the list's knob goes in list_owner, for list_same_gate. The id is in
+        | d0, the record's offset in d1. elemod 1.4: the site was the jsr alone.
         | ------------------------------------------------------------------
         .equ    LIST_NEW_RESUME, 0x40039da0
         .align  2
         .globl  lfo_rnd_list_new_gate
 lfo_rnd_list_new_gate:
 list_new_gate:
-        move.l  (%sp),%d1                         | the id
-        move.b  %d1,list_owner
+        move.l  0x24(%a0,%d1.l),%d7               | displaced: the record's flags
+        move.l  %d0,list_owner
+        move.l  %d0,%d1
+        sub.l   #ID_FIRST,%d1
+        bclr    #1,%d1
+        tst.l   %d1
+        bne.s   1f
+        or.l    #0x10000,%d7                      | DS1, DS2: a list on a turn
+1:      move.l  %d0,-(%sp)                        | displaced
         jsr     param_container_index             | displaced
         jmp     LIST_NEW_RESUME
+
+        | ------------------------------------------------------------------
+        | The turn and the push: stock opens the destination list where the
+        | knob's record has flag 0x10000, reading the record bound to stock's
+        | 469 (record 0's flags, none, for a mod's own id). Three places, each
+        | `move.l 0x24(%aN,%d0.l),%d0; andi.l #0x10000,%d0` and a beq on it:
+        | the turn's first touch (0x40039fbe, id in d2), after its delta
+        | (0x4003a224, id in d2), and the push (0x4003a890, id in d4). DS1 and
+        | DS2 answer 0x10000, so their turn and push open the list as 1.3's
+        | record patches made ids 1 and 3 do (elemod 1.4).
+        | ------------------------------------------------------------------
+        .align  2
+flag_ds:                                          | d0 |= 0x10000 for DS1/DS2 at 4(%sp)
+        move.l  %d1,-(%sp)
+        move.l  8(%sp),%d1
+        sub.l   #ID_FIRST,%d1
+        bclr    #1,%d1
+        tst.l   %d1
+        bne.s   9f
+        or.l    #0x10000,%d0
+9:      move.l  (%sp)+,%d1
+        rts
+
+        .globl  lfo_rnd_turn_flag_gate
+lfo_rnd_turn_flag_gate:
+        move.l  0x24(%a3,%d0.l),%d0               | displaced
+        andi.l  #0x10000,%d0                      | displaced
+        move.l  %d2,-(%sp)
+        bsr.s   flag_ds
+        addq.l  #4,%sp
+        tst.l   %d0
+        jmp     0x40039fc8                        | stock's beq on it
+
+        .globl  lfo_rnd_delta_flag_gate
+lfo_rnd_delta_flag_gate:
+        move.l  0x24(%a3,%d0.l),%d0               | displaced
+        andi.l  #0x10000,%d0                      | displaced
+        move.l  %d2,-(%sp)
+        bsr.s   flag_ds
+        addq.l  #4,%sp
+        tst.l   %d0
+        jmp     0x4003a22e                        | stock's beq on it
+
+        .globl  lfo_rnd_push_flag_gate
+lfo_rnd_push_flag_gate:
+        move.l  0x24(%a0,%d0.l),%d0               | displaced
+        andi.l  #0x10000,%d0                      | displaced
+        move.l  %d4,-(%sp)
+        bsr.s   flag_ds
+        addq.l  #4,%sp
+        tst.l   %d0
+        jmp     0x4003a89a                        | stock's beq.w on it
         .text
         .endif
 
@@ -874,10 +937,10 @@ lfo_rnd_page:                                     | core_pages: page 12
         .long   PAGE_RND
 page_rnd:                                         | {name, top row, bottom row}
         .long   str_page
-        .long   1, 3, 0, 0
-        .long   2, 4, 0, 0
+        .long   ID_FIRST, ID_FIRST+2, 0, 0
+        .long   ID_FIRST+1, ID_FIRST+3, 0, 0
 
-lfo_rnd_params:                                   | core_params: ids 1..4
+lfo_rnd_params:                                   | core_params: the four knob ids
         .long   ID_FIRST, ID_FIRST+3, lfo_rnd_get, lfo_rnd_delta, lfo_rnd_text
 
         | Destination list: the 8 machine parameters, then sample FIN and STA,
@@ -912,6 +975,20 @@ lfo_rnd_lock_dp2:
         .word   0, 15
         .long   str_r2dep, str_r2dep_l, str_cat
 
+        | core_knob_looks (core-ar2 0.13; elemod 1.4): {first, last, look, ui,
+        | min, max}. DS1 and DS2 draw as stock's LFO DST knob, which draws the
+        | destination's name (lfo_dst_knob_draw); DP1 and DP2 as the dial
+        | ids 1..4 had in 1.3, on 0..127 (8.8), as 1.3's record patches made it.
+        .globl  lfo_rnd_looks_ds1, lfo_rnd_looks_ds2, lfo_rnd_looks_dp1, lfo_rnd_looks_dp2
+lfo_rnd_looks_ds1:
+        .long   ID_FIRST, ID_FIRST, LOOK_DST, 0, 0, 0
+lfo_rnd_looks_ds2:
+        .long   ID_FIRST+2, ID_FIRST+2, LOOK_DST, 0, 0, 0
+lfo_rnd_looks_dp1:
+        .long   ID_FIRST+1, ID_FIRST+1, LOOK_DEP, 0, 0, 0x7f00
+lfo_rnd_looks_dp2:
+        .long   ID_FIRST+3, ID_FIRST+3, LOOK_DEP, 0, 0, 0x7f00
+
         .if     P_PHASE >= 2
         .align  2
 rng_state:      .long   0x6c8e9cf5                | the draw itself is 0000-shared's
@@ -922,35 +999,17 @@ held:           .space  4*VOICE_TRACKS            | {dst, offset} bytes, x2 per 
 
 str_none:       .asciz  "--"
 str_cat:        .asciz  "RND"                     | elemod 1.3: the parameters' category
-        .globl  lfo_rnd_str_r1dst_l
-lfo_rnd_str_r1dst_l:
 str_r1dst_l:    .asciz  "Random 1 Dest"
-        .globl  lfo_rnd_str_r1dep_l
-lfo_rnd_str_r1dep_l:
 str_r1dep_l:    .asciz  "Random 1 Depth"
-        .globl  lfo_rnd_str_r2dst_l
-lfo_rnd_str_r2dst_l:
 str_r2dst_l:    .asciz  "Random 2 Dest"
-        .globl  lfo_rnd_str_r2dep_l
-lfo_rnd_str_r2dep_l:
 str_r2dep_l:    .asciz  "Random 2 Depth"
         | One label, two uses: the page's name and the four parameters' group name
         | are the same text, so page_rnd points at it too.
 str_page:
-        .globl  lfo_rnd_str_group
-lfo_rnd_str_group:
 str_group:      .asciz  "LFO RND"
-        .globl  lfo_rnd_str_r1dst
-lfo_rnd_str_r1dst:
 str_r1dst:      .asciz  "DS1"
-        .globl  lfo_rnd_str_r1dep
-lfo_rnd_str_r1dep:
 str_r1dep:      .asciz  "DP1"
-        .globl  lfo_rnd_str_r2dst
-lfo_rnd_str_r2dst:
 str_r2dst:      .asciz  "DS2"
-        .globl  lfo_rnd_str_r2dep
-lfo_rnd_str_r2dep:
 str_r2dep:      .asciz  "DP2"
 
         | elemod: 0000-shared's runtime, a private copy in this unit
