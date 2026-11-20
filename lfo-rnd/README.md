@@ -5,7 +5,7 @@ Port of rytm-mods-src `mods/0004-lfo-rnd` (MrScruff; `built` in its mod.toml, li
 
 A second LFO page, LFO RND: press the LFO page key again (and again to return). DS1/DS2 (knobs A, B) are destinations picked from stock's LFO DST list restricted to sixteen (the eight machine parameters, FIN, STA, FRQ, RES, DEC, PAN, DEL, REV); DP1/DP2 (E, F) are depths, 0..64 in sixteen steps. On every note trig each modifier offsets its destination by a random -N..+N, clamped to the parameter's range, held until the next note, on top of p-locks, slides and LFO 1. Stored in the sound, in core-ar2 0.2's mod storage (below). Voice tracks only; not p-lockable.
 
-Needs core-ar2 0.2 or later (`"resources": {"core": "0.2"}`); from 1.2 core-ar2 0.4, from 1.3 core-ar2 0.9.
+Needs core-ar2 0.2 or later (`"resources": {"core": "0.2"}`); from 1.2 core-ar2 0.4, from 1.3 core-ar2 0.9, from 1.4 core-ar2 0.13.
 
 ## Storage (1.1)
 
@@ -35,8 +35,8 @@ needs 18 of them today.
   kit save (checked: see Results).
 
 The sound's parameter word 0 is no longer where the settings live, so its stock bytes stay
-stock (0). The ROM record patches making ids 1..4's container index 0 stay: the destination
-list, `list_filter_gate`, `list_same_gate` and `knob_cidx_gate` key on it.
+stock (0). (1.1 to 1.3 also patched the ROM records of ids 1..4, the knobs they borrowed; 1.4
+has knob ids of its own and patches no record: see 1.4 below.)
 
 **Sounds saved by 1.0 keep their settings.** lfo-rnd 1.0 (and rytm-mods) kept the word in
 parameter word 0 (live sound +0x14, stored slot 41), which stock loads and saves. 1.1 reads
@@ -48,44 +48,27 @@ too. The cost is a test and a branch per read.
 
 ## Sites
 
-31 sites (1.1 had 38), the claims rytm-mods' registry makes for its default build
-(`registry/allocations.toml`, owner `0004-lfo-rnd`):
+11 sites (1.3 had 31), OS 1.74 (the six below 0x40057000 are at the same addresses on 1.73):
 
 | addr | op | |
 |---|---|---|
-| 0x40039d32 | jmp | `jmp lfo_rnd_list_same_gate` |
-| 0x40039d9a | jmp | `jmp lfo_rnd_list_new_gate` |
-| 0x4003a5f2 | jmp | `jmp lfo_rnd_knob_cidx_gate` |
-| 0x4004aec6 | jmp | `jmp lfo_rnd_list_filter_gate` |
-| 0x4009b000 | jmp | `jmp lfo_rnd_trig_cfg_gate` |
-| 0x400a857c | jmp | `jmp lfo_rnd_knob_draw_gate` |
-| 0x400a8dfa | jmp | `jmp lfo_rnd_read_gate` |
-| 0x400a9000 | jmp | `jmp lfo_rnd_setter_gate` |
-| 0x40120fae | jmp | `jmp lfo_rnd_audio_gate` |
-| 0x401bf950 | bytes | `ffffffff` -> `00000000` |
-| 0x401bf958 | bytes | `00000000` -> `00007f00` |
-| 0x401bf970 | bytes | `00000000` -> `00010000` |
-| 0x401bf974 | ptr | pointer -> `lfo_rnd_str_r1dst_l` |
-| 0x401bf978 | ptr | pointer -> `lfo_rnd_str_group` |
-| 0x401bf97c | ptr | pointer -> `lfo_rnd_str_r1dst` |
-| 0x401bf984 | bytes | `ffffffff` -> `00000000` |
-| 0x401bf98c | bytes | `00000000` -> `00007f00` |
-| 0x401bf9a8 | ptr | pointer -> `lfo_rnd_str_r1dep_l` |
-| 0x401bf9ac | ptr | pointer -> `lfo_rnd_str_group` |
-| 0x401bf9b0 | ptr | pointer -> `lfo_rnd_str_r1dep` |
-| 0x401bf9b8 | bytes | `ffffffff` -> `00000000` |
-| 0x401bf9c0 | bytes | `00000000` -> `00007f00` |
-| 0x401bf9d8 | bytes | `00000000` -> `00010000` |
-| 0x401bf9dc | ptr | pointer -> `lfo_rnd_str_r2dst_l` |
-| 0x401bf9e0 | ptr | pointer -> `lfo_rnd_str_group` |
-| 0x401bf9e4 | ptr | pointer -> `lfo_rnd_str_r2dst` |
-| 0x401bf9ec | bytes | `ffffffff` -> `00000000` |
-| 0x401bf9f4 | bytes | `00000000` -> `00007f00` |
-| 0x401bfa10 | ptr | pointer -> `lfo_rnd_str_r2dep_l` |
-| 0x401bfa14 | ptr | pointer -> `lfo_rnd_str_group` |
-| 0x401bfa18 | ptr | pointer -> `lfo_rnd_str_r2dep` |
+| 0x40039d32 | jmp | `lfo_rnd_list_same_gate`: is the open list this knob's |
+| 0x40039d94 | jmp | `lfo_rnd_list_new_gate`: a new list, its knob, and DS1/DS2's list flag (1.4: from 0x40039d94, 12 bytes; was the jsr at 0x40039d9a) |
+| 0x40039fbe | jmp | `lfo_rnd_turn_flag_gate`: a turn's list flag (1.4) |
+| 0x4003a224 | jmp | `lfo_rnd_delta_flag_gate`: the list flag after a turn's delta (1.4) |
+| 0x4003a5f2 | jmp | `lfo_rnd_knob_cidx_gate`: the knob release's test |
+| 0x4003a890 | jmp | `lfo_rnd_push_flag_gate`: a push's list flag (1.4) |
+| 0x4004aec6 | jmp | `lfo_rnd_list_filter_gate`: the list cut to sixteen |
+| 0x4009b06c | jmp | `lfo_rnd_trig_cfg_gate` |
+| 0x400a8e66 | jmp | `lfo_rnd_read_gate` |
+| 0x400a906c | jmp | `lfo_rnd_setter_gate` |
+| 0x4012101a | jmp | `lfo_rnd_audio_gate` |
 
-core-ar2 0.4 entries (1.2): `core_pages` `lfo_rnd_page` (page 12, LFO RND) and `core_params` `lfo_rnd_params` (ids 1..4: `lfo_rnd_get`, `lfo_rnd_delta`, `lfo_rnd_text`), in place of 1.1's four detours at the entries of page_info, page_get_value, param_apply_delta and param_value_text; and `core_view_pages` `lfo_rnd_view_page` (LFO RND behind the LFO key, order 20), in place of 1.1's own list for the LFO view. The header's title after the page key's step, which 1.1 pushed itself for every view (0x4003ab94), is core-ar2 0.4's.
+1.3's other 22 sites, at 0x401bfc00..0x401bfcc8, patched the parameter records of ids 1..4
+(container index, range, list flag, names), and its site at 0x400a85e8 drew DS1 and DS2; 1.4
+needs none of them.
+
+core-ar2 0.4 entries (1.2): `core_pages` `lfo_rnd_page` (page 12, LFO RND) and `core_params` `lfo_rnd_params` (1.2, 1.3: ids 1..4; 1.4: its own four, `__knobs` + 0..3; `lfo_rnd_get`, `lfo_rnd_delta`, `lfo_rnd_text`), in place of 1.1's four detours at the entries of page_info, page_get_value, param_apply_delta and param_value_text; and `core_view_pages` `lfo_rnd_view_page` (LFO RND behind the LFO key, order 20), in place of 1.1's own list for the LFO view. The header's title after the page key's step, which 1.1 pushed itself for every view (0x4003ab94), is core-ar2 0.4's.
 
 A detour is a `jmp` site over the whole stock instructions it displaces; the stub re-emits them
 as in rytm-mods. Where rytm-mods patched the address operand of a `jsr`/`lea`/`move.l #`, the
@@ -93,6 +76,28 @@ site is elemod's `keep2` (the opcode word kept, the address the mod's). A pointe
 table is a `ptr` site.
 
 ## Changes from rytm-mods
+
+### 1.4: the page on knob ids of its own (core 0.13)
+
+The page's four knobs are lfo-rnd's own knob ids, `__knobs` + 0..3 (`"knobs": 4`; the linker
+gives them, from 555 up), in place of stock ids 1..4, which 1.1 to 1.3 borrowed by patching
+their parameter records. The reason: core-ar2 0.13 takes 0x400a85e8 (`core_graphic_hook`, knob
+looks), which 1.3 also took to draw DS1 and DS2, so 1.3 links with no core from 0.13, flashed or
+from the +Drive. What the page shows and does is unchanged.
+
+- **Labels and names**: the `core_lock_params` entries' (DS1, Random 1 Dest, ...), as before.
+- **Looks** (`core_knob_looks`): DS1 and DS2 take stock's LFO DST knob (id 67), whose graphic
+  draws the destination's name, as 1.3's own draw did; DP1 and DP2 take the dial of id 2 with a
+  range of 0..127 (8.8), as 1.3's record patches gave ids 2 and 4.
+- **The destination list**: stock opens it on a turn or a push of a knob whose parameter record
+  has flag 0x10000, reading the record bound to its 469 records, so a mod's own id reads record
+  0, which has none. Three new sites (the turn, after its delta, the push) and the list's own
+  site, widened to 0x40039d94, set the flag for DS1 and DS2 (traced in Ghidra, OS 1.74).
+- **Which list is whose**: core answers container index -1 for a mod's own id (1.3's records
+  gave 0), so the filter takes a list of index -1 whose knob is DS1 or DS2 (`list_owner`, now a
+  long), and the picker's and the release's tests give the page's other knobs -2.
+- **Needs core-ar2 0.13** (`"resources": {"core": "0.13"}`). Settings saved by 1.3 load
+  unchanged: the four fields are the same.
 
 ### 1.3: the four settings as core-ar2 parameters (core 0.9)
 
@@ -148,6 +153,24 @@ with core 0.4 (their sites overlap core's), and 1.2 does not link with core 0.3.
    change is kept and the rest are as they were.
 
 ## Results so far
+
+### 1.4 on core-ar2 0.14 (emulator only)
+
+analog-emu (trigcondition/analog-emu 2ac0f1f), OS 1.74, 2026-11-19/20, core-ar2 0.14 and
+drive-loader 0.9 (Iced-Cream/elekloader drive-v2 ed2da54) with lfo-rnd 1.4. Not yet on a unit.
+
+- Built, linted and linked: 11 sites, `.run` 2180 bytes; the linker gave knob ids 555..558.
+- Flashed: LFO, LFO opens LFO RND (DS1, DS2, DP1, DP2), and DS1 and DS2 draw LEV. Turning or
+  pushing DS1 opens the list of sixteen at the left edge (header RANDOM 1 DEST). Turning moves
+  its highlight, YES shows CONFIRMED! and DS1 then draws TUN, and NO keeps the old value. With
+  DS1's list open, turning DS2 opens DS2's, and YES writes DS2 only. DP1 and DP2 step and show
+  N. Under the emulator's nudges they step as stock's SPH does with the same nudges (stock's turn
+  throttle).
+- Flashed, power off without a kit save and cold boot: DS1 TUN and DP1 kept.
+- +Drive: core + drive-loader 0.9 flashed, lfo-rnd uploaded to /mods over USB MIDI (host check
+  LOADED, 2180 bytes), made active, rebooted: the same tour shows the same screens as flashed.
+- Not checked: the offsets as played and heard, a DP knob's release with a DS list open, and
+  the unit.
 
 ### 1.3 on core-ar2 0.9 and 0.10
 
