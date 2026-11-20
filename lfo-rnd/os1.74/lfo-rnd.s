@@ -65,7 +65,7 @@
         .equ    VT_CONFIG_CHANGED, 16             | the sound accessor's change notice
         .equ    SOUND_CONFIG_CHANGED, 0x401cb88c  | SoundConfigChangedInfo's vtable
 
-        .extern core_store_get, core_store_set, core_param_int
+        .extern core_store_get, core_store_set, core_param_int, core_knob_list_id
         .extern lfo_rnd_ds1, lfo_rnd_dp1, lfo_rnd_ds2, lfo_rnd_dp2
 
         .text
@@ -264,7 +264,7 @@ lfo_rnd_get:
         | A destination writes on every turn, as LFO DST does: the destination
         | list does not scroll itself, the picker moves its highlight to the
         | value it reads back after the write. YES commits that entry through
-        | setter_gate; NO writes back the value the list opened on.
+        | apply_gate; NO writes back the value the list opened on.
         | ------------------------------------------------------------------
         .align  2
 lfo_rnd_delta:
@@ -468,28 +468,40 @@ read_gate:
         jmp     param_set_read_body
 
         | ------------------------------------------------------------------
-        | param_set_value for ids 1..4, where the destination list's commit lands.
+        | Where the destination list's commit lands for ids 1..4 (1.5).
         |
-        | Entered by a jmp at the entry: (%sp) return, 4 the parameter set, 8 the
-        | id, 12 the value in 8.8. The list writes the chosen parameter's container
-        | index, so it maps back to a position here and the field is rewritten in
-        | place. A destination the sixteen do not hold is left alone, as is a depth
-        | id: the list never offers one, and letting stock write it would overwrite
-        | the packed word with a raw value.
+        | YES commits through the parameter set's setter, which since core 0.17
+        | is core's (ev_param_set), so lfo-rnd no longer takes its entry. The
+        | setter clamps, checks and calls the class's apply (+0x30), which asks
+        | param_container_index for the id and returns at once for a negative
+        | one: what core answers for every own id. This stub is that branch,
+        | the 8 bytes after the call (addq, move.l %d0,%d4, blt.w), so it runs
+        | only for an own id, with the set in %a2, the id in %d2 and the clamped
+        | value (8.8) in %d3; the apply's frame saved %d2-%d7/%a2, and its exit
+        | restores them. The value is the chosen parameter's container index,
+        | which maps back to a position, and the field is rewritten in place.
+        | A destination the sixteen do not hold, a depth id and every other own
+        | id leave as stock would: nothing written. The setter's return reads
+        | the value back through read_gate, so ev_param_set sees the new one.
         | ------------------------------------------------------------------
+        .equ    APPLY_RESUME,   0x400a9e32        | the apply after its blt.w
+        .equ    APPLY_DONE,     0x400a9f1e        | the apply's exit
         .align  2
-        .globl  lfo_rnd_setter_gate
-lfo_rnd_setter_gate:
-setter_gate:
-        move.l  8(%sp),%d0
+        .globl  lfo_rnd_apply_gate
+lfo_rnd_apply_gate:
+        addq.l  #4,%sp                            | displaced
+        move.l  %d0,%d4                           | displaced
+        blt.s   1f
+        jmp     APPLY_RESUME
+1:      move.l  %d2,%d0
         sub.l   #ID_FIRST,%d0
         moveq   #3,%d1
         cmp.l   %d1,%d0
-        bhi.s   9f
-        move.l  %d0,-(%sp)                        | field
+        bhi.s   9f                                | not ours
         btst    #0,%d0
-        bne.s   8f                                | a depth: swallow it
-        move.l  16(%sp),%d0                       | the value
+        bne.s   9f                                | a depth: nothing to write
+        move.l  %d0,-(%sp)                        | field
+        move.l  %d3,%d0
         lsr.l   #8,%d0                            | -> container index
         bsr.w   pos_of
         tst.l   %d0
@@ -501,16 +513,13 @@ setter_gate:
         subq.l  #1,%d1
         beq.s   7f
         clr.l   -(%sp)                            | lfo-rnd 1.0's word moved out:
-        move.l  16(%sp),-(%sp)                    | clear it in the kit's bank too
-        move.l  16(%sp),%a1                       | the parameter set
+        move.l  %d2,-(%sp)                        | clear it in the kit's bank too
+        move.l  %a2,%a1                           | the parameter set
         jsr     shared_mark_changed_set
         addq.l  #8,%sp
-7:      jsr     notify                            | elemod 1.1: was shared_mark_changed_set
+7:      jsr     notify
 8:      addq.l  #4,%sp
-        rts
-9:      lea     %sp@(-40),%sp                     | displaced
-        moveml  %d2-%d7/%a2,%sp@                  | displaced
-        jmp     param_set_value_body
+9:      jmp     APPLY_DONE
 
         | ------------------------------------------------------------------
         | The destination list, filtered to our sixteen.
@@ -527,7 +536,7 @@ setter_gate:
         | list and 0x200 for MOD SETUP's, which the same constructor builds at
         | 0x4004bab8; the index is -1, what core's param_container_index answers
         | for a mod's own knob id (LFO DST's own is 4; elemod 1.4, was the 0 1.3's
-        | record patches gave ids 1..4); and list_new_gate saw DS1 or DS2 open it.
+        | record patches gave ids 1..4); and core_knob_list_id is DS1 or DS2 (1.5).
         |
         | The panel is moved to the left edge here too. Its geometry reached the view
         | before this point - x at +184, width at +188 - and stock's 49 + 79 puts it
@@ -552,7 +561,7 @@ list_filter_gate:
         moveq   #-1,%d0                           | container index -1, a knob with
         cmp.l   %fp@(20),%d0                      | no sound slot (elemod 1.4: was 0)
         bne.s   8f
-        move.l  list_owner,%d0                    | and the list DS1's or DS2's
+        move.l  core_knob_list_id,%d0             | and the list DS1's or DS2's
         bsr.w   ds_of
         bne.s   8f
         move.l  %fp@(8),%a0                       | the view being built
@@ -611,7 +620,7 @@ cidx_of:
         btst    #0,%d1
         bne.s   1f                                | DP1, DP2
         add.l   #ID_FIRST,%d1
-        cmp.l   list_owner,%d1
+        cmp.l   core_knob_list_id,%d1
         beq.s   9f                                | the list's own DS: stock's -1
 1:      moveq   #-2,%d0
 9:      move.l  (%sp)+,%d1
@@ -625,8 +634,8 @@ cidx_of:
         | matches the knob's, and cancels it and opens the knob's own otherwise.
         | DS1 and DS2 share index -1, so turning one with the other's list up
         | would move that list, and YES would write the value into the list's
-        | parameter. The list does not record its parameter, so list_new_gate
-        | keeps it in list_owner, and cidx_of answers -2 for the other knobs.
+        | parameter. The list does not record its parameter; core keeps its
+        | knob in core_knob_list_id (1.5), and cidx_of answers -2 for the others.
         | ------------------------------------------------------------------
         .equ    LIST_SAME_RESUME, 0x40039d38
         .align  2
@@ -638,8 +647,6 @@ lfo_rnd_list_same_gate:
         addq.l  #4,%sp
         jmp     LIST_SAME_RESUME
 
-list_owner:                                       | the id the open list is for
-        .long   0
 
         | ------------------------------------------------------------------
         | The knob-release test.
@@ -665,81 +672,13 @@ knob_cidx_gate:
         jmp     KNOB_CIDX_RESUME
 
         | ------------------------------------------------------------------
-        | The picker, creating a list (0x40039d94..0x40039da0): stock reads the
-        | knob's record flags, bound to its 469 records (record 0's for a mod's
-        | own id), and opens the LFO destination list when 0x10000 is set. DS1
-        | and DS2 have that flag, as 1.3's record patches gave ids 1 and 3; and
-        | the list's knob goes in list_owner, for list_same_gate. The id is in
-        | d0, the record's offset in d1. elemod 1.4: the site was the jsr alone.
+        | The list flag and the list's knob (elemod 1.5): core-ar2 0.18 takes
+        | the picker's list creation (0x40039d94), the turn's two flag reads
+        | (0x40039fbe, 0x4003a224) and the push's (0x4003a890), which 1.4 gated
+        | here. DS1 and DS2 get CORE_KNOB_LIST from their core_knob_flags
+        | entries (lfo_rnd_flags_ds1, _ds2, below), and the knob a list opened
+        | for is core's core_knob_list_id, which 1.4 kept as list_owner.
         | ------------------------------------------------------------------
-        .equ    LIST_NEW_RESUME, 0x40039da0
-        .align  2
-        .globl  lfo_rnd_list_new_gate
-lfo_rnd_list_new_gate:
-list_new_gate:
-        move.l  0x24(%a0,%d1.l),%d7               | displaced: the record's flags
-        move.l  %d0,list_owner
-        move.l  %d0,%d1
-        sub.l   #ID_FIRST,%d1
-        bclr    #1,%d1
-        tst.l   %d1
-        bne.s   1f
-        or.l    #0x10000,%d7                      | DS1, DS2: a list on a turn
-1:      move.l  %d0,-(%sp)                        | displaced
-        jsr     param_container_index             | displaced
-        jmp     LIST_NEW_RESUME
-
-        | ------------------------------------------------------------------
-        | The turn and the push: stock opens the destination list where the
-        | knob's record has flag 0x10000, reading the record bound to stock's
-        | 469 (record 0's flags, none, for a mod's own id). Three places, each
-        | `move.l 0x24(%aN,%d0.l),%d0; andi.l #0x10000,%d0` and a beq on it:
-        | the turn's first touch (0x40039fbe, id in d2), after its delta
-        | (0x4003a224, id in d2), and the push (0x4003a890, id in d4). DS1 and
-        | DS2 answer 0x10000, so their turn and push open the list as 1.3's
-        | record patches made ids 1 and 3 do (elemod 1.4).
-        | ------------------------------------------------------------------
-        .align  2
-flag_ds:                                          | d0 |= 0x10000 for DS1/DS2 at 4(%sp)
-        move.l  %d1,-(%sp)
-        move.l  8(%sp),%d1
-        sub.l   #ID_FIRST,%d1
-        bclr    #1,%d1
-        tst.l   %d1
-        bne.s   9f
-        or.l    #0x10000,%d0
-9:      move.l  (%sp)+,%d1
-        rts
-
-        .globl  lfo_rnd_turn_flag_gate
-lfo_rnd_turn_flag_gate:
-        move.l  0x24(%a3,%d0.l),%d0               | displaced
-        andi.l  #0x10000,%d0                      | displaced
-        move.l  %d2,-(%sp)
-        bsr.s   flag_ds
-        addq.l  #4,%sp
-        tst.l   %d0
-        jmp     0x40039fc8                        | stock's beq on it
-
-        .globl  lfo_rnd_delta_flag_gate
-lfo_rnd_delta_flag_gate:
-        move.l  0x24(%a3,%d0.l),%d0               | displaced
-        andi.l  #0x10000,%d0                      | displaced
-        move.l  %d2,-(%sp)
-        bsr.s   flag_ds
-        addq.l  #4,%sp
-        tst.l   %d0
-        jmp     0x4003a22e                        | stock's beq on it
-
-        .globl  lfo_rnd_push_flag_gate
-lfo_rnd_push_flag_gate:
-        move.l  0x24(%a0,%d0.l),%d0               | displaced
-        andi.l  #0x10000,%d0                      | displaced
-        move.l  %d4,-(%sp)
-        bsr.s   flag_ds
-        addq.l  #4,%sp
-        tst.l   %d0
-        jmp     0x4003a89a                        | stock's beq.w on it
         .text
         .endif
 
@@ -988,6 +927,14 @@ lfo_rnd_looks_dp1:
         .long   ID_FIRST+1, ID_FIRST+1, LOOK_DEP, 0, 0, 0x7f00
 lfo_rnd_looks_dp2:
         .long   ID_FIRST+3, ID_FIRST+3, LOOK_DEP, 0, 0, 0x7f00
+
+        | core_knob_flags (core-ar2 0.18; elemod 1.5): {first, last, flags}.
+        | DS1 and DS2 open stock's destination list on a turn or a push.
+        .globl  lfo_rnd_flags_ds1, lfo_rnd_flags_ds2
+lfo_rnd_flags_ds1:
+        .long   ID_FIRST, ID_FIRST, 0x10000       | CORE_KNOB_LIST
+lfo_rnd_flags_ds2:
+        .long   ID_FIRST+2, ID_FIRST+2, 0x10000
 
         .if     P_PHASE >= 2
         .align  2
