@@ -672,7 +672,7 @@ knob_cidx_gate:
         jmp     KNOB_CIDX_RESUME
 
         | ------------------------------------------------------------------
-        | The list flag and the list's knob (elemod 1.5): core-ar2 0.18 takes
+        | The list flag and the list's knob (elemod 1.5): core-ar2 0.17 takes
         | the picker's list creation (0x40039d94), the turn's two flag reads
         | (0x40039fbe, 0x4003a224) and the push's (0x4003a890), which 1.4 gated
         | here. DS1 and DS2 get CORE_KNOB_LIST from their core_knob_flags
@@ -928,7 +928,7 @@ lfo_rnd_looks_dp1:
 lfo_rnd_looks_dp2:
         .long   ID_FIRST+3, ID_FIRST+3, LOOK_DEP, 0, 0, 0x7f00
 
-        | core_knob_flags (core-ar2 0.18; elemod 1.5): {first, last, flags}.
+        | core_knob_flags (core-ar2 0.17; elemod 1.5): {first, last, flags}.
         | DS1 and DS2 open stock's destination list on a turn or a push.
         .globl  lfo_rnd_flags_ds1, lfo_rnd_flags_ds2
 lfo_rnd_flags_ds1:

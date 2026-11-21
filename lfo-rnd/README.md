@@ -64,7 +64,7 @@ too. The cost is a test and a branch per read.
 (container index, range, list flag, names), and its site at 0x400a85e8 drew DS1 and DS2; 1.4
 needs none of them.
 
-1.5 (core-ar2 0.18) drops 1.4's four list-flag sites (0x40039d94, 0x40039fbe, 0x4003a224, 0x4003a890): two `core_knob_flags` entries give DS1 and DS2 the list flag, and the open list's knob is core's `core_knob_list_id`. Its commit moved from the setter's entry (0x400a906c), core-ar2 0.17's `ev_param_set` site, to the apply's own-id exit: stock's write for an own id ends there with nothing written, and the setter then reads the value back through `lfo_rnd_read_gate`.
+1.5 (core-ar2 0.17) drops 1.4's four list-flag sites (0x40039d94, 0x40039fbe, 0x4003a224, 0x4003a890): two `core_knob_flags` entries give DS1 and DS2 the list flag, and the open list's knob is core's `core_knob_list_id`. Its commit moved from the setter's entry (0x400a906c), core-ar2 0.17's `ev_param_set` site, to the apply's own-id exit: stock's write for an own id ends there with nothing written, and the setter then reads the value back through `lfo_rnd_read_gate`.
 
 core-ar2 0.4 entries (1.2): `core_pages` `lfo_rnd_page` (page 12, LFO RND) and `core_params` `lfo_rnd_params` (1.2, 1.3: ids 1..4; 1.4: its own four, `__knobs` + 0..3; `lfo_rnd_get`, `lfo_rnd_delta`, `lfo_rnd_text`), in place of 1.1's four detours at the entries of page_info, page_get_value, param_apply_delta and param_value_text; and `core_view_pages` `lfo_rnd_view_page` (LFO RND behind the LFO key, order 20), in place of 1.1's own list for the LFO view. The header's title after the page key's step, which 1.1 pushed itself for every view (0x4003ab94), is core-ar2 0.4's.
 
@@ -75,9 +75,9 @@ table is a `ptr` site.
 
 ## Changes from rytm-mods
 
-### 1.5: the list flag and the list's knob from core (core 0.18)
+### 1.5: the list flag and the list's knob from core (core 0.17)
 
-DS1 and DS2 get stock's destination list from core-ar2 0.18's `core_knob_flags` (`lfo_rnd_flags_ds1`, `lfo_rnd_flags_ds2`, `CORE_KNOB_LIST`), and `lfo_rnd_list_same_gate` and `lfo_rnd_list_filter_gate` read the open list's knob from `core_knob_list_id` in place of 1.4's own. YES lands in `lfo_rnd_apply_gate` (see Sites). 1.4 links with core 0.13 to 0.16 only.
+DS1 and DS2 get stock's destination list from core-ar2 0.17's `core_knob_flags` (`lfo_rnd_flags_ds1`, `lfo_rnd_flags_ds2`, `CORE_KNOB_LIST`), and `lfo_rnd_list_same_gate` and `lfo_rnd_list_filter_gate` read the open list's knob from `core_knob_list_id` in place of 1.4's own. YES lands in `lfo_rnd_apply_gate` (see Sites). 1.4 links with core 0.13 to 0.16 only.
 
 ### 1.4: the page on knob ids of its own (core 0.13)
 
